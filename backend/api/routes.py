@@ -7,13 +7,18 @@ from __future__ import annotations
 import asyncio
 import asyncio.subprocess
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from backend.api import board
 from backend.api.deps import get_redis
 from backend.api.models import CapabilityResponse, SwitchStateResponse
-from backend.core.redis_client import RedisClient, CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS
-from backend.api import board
+from backend.core.redis_client import (
+    CHANNEL_BOARD_EVENTS,
+    CHANNEL_HARDWARE_EVENTS,
+    CHANNEL_SWITCH_EVENTS,
+    RedisClient,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
 router.include_router(board.router)
@@ -36,8 +41,9 @@ async def get_capabilities(
         return {}
 
 
-import os
 import json
+import os
+
 
 @router.get(
     "/switches",
@@ -50,7 +56,7 @@ async def get_all_switches(
     """批量获取所有软开关状态，前端用于初始化控制面板。"""
     if redis is None:
         return {}
-    
+
     # 从环境变量(由 compiler.py 注入)解析可用的开关及其物理容器映射，实现后端驱动前端
     switch_map_str = os.getenv("SWITCH_CONTAINER_MAP", "{}")
     try:
@@ -71,15 +77,15 @@ async def get_all_switches(
             updated_at = float(switch.get("updated_at", 0))
         except (TypeError, ValueError):
             updated_at = 0.0
-            
+
         results[name] = SwitchStateResponse(
             state=state,
             reason=switch.get("reason"),
             updated_at=updated_at,
             updated_by=switch.get("updated_by") or "system",
-            label=f"🎯 架构资源 [{name}] ({container_name})"
+            label=f"🎯 架构资源 [{name}] ({container_name})",
         )
-        
+
     # 对于在 Redis 中存在但不在 system.yaml 映射中的废弃开关也展示出来（可能需要清理）
     for name, switch in switches_data.items():
         if name not in results:
@@ -94,7 +100,7 @@ async def get_all_switches(
                 reason=switch.get("reason"),
                 updated_at=updated_at,
                 updated_by=switch.get("updated_by") or "system",
-                label=f"孤立状态 [{name}]"
+                label=f"孤立状态 [{name}]",
             )
 
     return results
@@ -130,8 +136,11 @@ async def get_switch(
 
 
 from pydantic import BaseModel
+
+
 class SwitchToggleRequest(BaseModel):
     state: str
+
 
 @router.post(
     "/switches/{name}",
@@ -155,11 +164,14 @@ async def toggle_switch(
         raise HTTPException(status_code=400, detail="Invalid state, use ON or OFF")
 
     # TODO: 后续应增加 JWT RBAC 鉴权，目前假定有权限
-    await redis.set_switch(name, new_state, updated_by="manual_override", reason="User manual toggle")
+    await redis.set_switch(
+        name, new_state, updated_by="manual_override", reason="User manual toggle"
+    )
 
     # ZEN70 1.1: Web网关通过 Redis pub/sub 与拥有 docker.sock 权限的底层探针通信
     # 我们不在网关层直接执行 subprocess (受制于 read_only 和 cap_drop)，而是发布变更事件
     import json
+
     payload = json.dumps({"switch": name, "state": new_state})
     pubsub = redis.pubsub()
     # redis-py 在 FastApi 这里的 pubsub 可能只用于订阅，如果是发布，可以直接 redis._client.publish
@@ -170,7 +182,6 @@ async def toggle_switch(
         pass
 
     return await get_switch(name, redis)
-
 
 
 @router.get(
@@ -199,11 +210,15 @@ async def sse_events(
 
     async def event_generator():
         try:
-            await pubsub.subscribe(CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS)
+            await pubsub.subscribe(
+                CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS
+            )
             yield "event: connected\ndata: {}\n\n"
             while True:
                 try:
-                    if getattr(request, "is_disconnected", None) and callable(request.is_disconnected):
+                    if getattr(request, "is_disconnected", None) and callable(
+                        request.is_disconnected
+                    ):
                         if request.is_disconnected():
                             break
                     message = await asyncio.wait_for(
@@ -225,7 +240,9 @@ async def sse_events(
                     yield ": heartbeat\n\n"
         finally:
             try:
-                await pubsub.unsubscribe(CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS)
+                await pubsub.unsubscribe(
+                    CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS
+                )
             except Exception:
                 pass
             try:

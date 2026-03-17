@@ -1,11 +1,10 @@
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -19,6 +18,7 @@ if config.config_file_name is not None:
 import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Ensure backend module is discoverable by Alembic
@@ -36,17 +36,18 @@ if POSTGRES_DSN:
         POSTGRES_DSN = POSTGRES_DSN.replace("postgresql://", "postgresql+asyncpg://", 1)
     if os.getenv("DB_OFFLINE_LOCAL") == "1":
         # Force rewrite for Windows port-forwarded offline tasks
-        POSTGRES_DSN = POSTGRES_DSN.replace(
-            "@pgbouncer:5432/", "@localhost:5432/"
-        ).replace("@postgres:5432/", "@localhost:5432/")
+        POSTGRES_DSN = POSTGRES_DSN.replace("@pgbouncer:5432/", "@localhost:5432/").replace(
+            "@postgres:5432/", "@localhost:5432/"
+        )
     config.set_main_option("sqlalchemy.url", POSTGRES_DSN)
+
+import backend.models.asset
+import backend.models.device
+import backend.models.feature_flag
+import backend.models.system
 
 # Import all models to ensure they are registered with Base.metadata
 from backend.models.user import Base
-import backend.models.asset
-import backend.models.feature_flag
-import backend.models.system
-import backend.models.device
 
 target_metadata = Base.metadata
 
@@ -126,9 +127,7 @@ def _watchdog_thread(redis_client, lock, stop_event):
         stop_event.wait(10)
 
 
-def _acquire_migration_lock() -> (
-    "tuple[object, object, threading.Event, threading.Thread] | None"
-):
+def _acquire_migration_lock() -> "tuple[object, object, threading.Event, threading.Thread] | None":
     """尝试连接 Redis 并获取迁移锁；不可用时返回 None（离线模式可跳过）。"""
     try:
         import redis
@@ -157,9 +156,7 @@ def _acquire_migration_lock() -> (
             )
             watchdog.start()
             return (r, lock, stop_event, watchdog)
-        raise RuntimeError(
-            "无法在 60s 内获取 DB_MIGRATION_LOCK，可能有其他节点正在执行迁移"
-        )
+        raise RuntimeError("无法在 60s 内获取 DB_MIGRATION_LOCK，可能有其他节点正在执行迁移")
     except Exception:
         if os.getenv("SKIP_DB_MIGRATION_LOCK"):
             return None

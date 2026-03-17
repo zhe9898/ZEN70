@@ -8,11 +8,11 @@ import os
 from functools import lru_cache
 from typing import Any, Dict
 
-from fastapi import Depends, Request, Response, HTTPException
+from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from backend.core.redis_client import RedisClient
 from backend.core.jwt import decode_token
+from backend.core.redis_client import RedisClient
 from backend.db import get_db_session
 
 # 可选：不自动 403，由 get_current_user 返回 401 + ZEN-xxx
@@ -48,7 +48,6 @@ async def get_db():
         yield session
 
 
-
 async def get_current_user(
     request: Request,
     response: Response,
@@ -69,10 +68,7 @@ async def get_current_user(
     return payload
 
 
-async def get_tenant_db(
-    current_user: dict = Depends(get_current_user),
-    db = Depends(get_db)
-):
+async def get_tenant_db(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
     """
     返回绑定了当前租户上下文（RLS 生效）的 AsyncSession。
     """
@@ -92,7 +88,6 @@ async def get_current_admin(
             detail={"code": "ZEN-AUTH-403", "message": "Admin privileges required", "details": {}},
         )
     return current_user
-
 
 
 async def get_current_user_optional(

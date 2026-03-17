@@ -1,6 +1,8 @@
-from sqlalchemy import Column, String, Text, DateTime, Integer
+from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
-from backend.models.user import Base # Assuming user.py contains declarative Base
+
+from backend.models.user import Base  # Assuming user.py contains declarative Base
+
 
 class SystemLog(Base):
     __tablename__ = "system_logs"

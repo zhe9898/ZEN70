@@ -8,10 +8,10 @@ ZEN70 性能监控组件 (法典 4.0 & 7.0 契约)
 """
 
 import time
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 from fastapi import Request, Response
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Gauge, Histogram
 
 # ---------------------------------------------------------------------------
 # SRE 指标定义
@@ -20,19 +20,19 @@ from prometheus_client import Counter, Histogram, Gauge
 API_REQUESTS_TOTAL = Counter(
     "zen70_api_requests_total",
     "Total HTTP requests handled by the FastAPI application",
-    ["method", "endpoint", "status"]
+    ["method", "endpoint", "status"],
 )
 
 API_REQUEST_DURATION = Histogram(
     "zen70_api_request_duration_seconds",
     "HTTP request duration in seconds (Target P99 <= 500ms)",
     ["method", "endpoint"],
-    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
 )
 
 ACTIVE_CONNECTIONS = Gauge(
     "zen70_sse_active_connections",
-    "Number of active HTTP/SSE connections currently handled by the server"
+    "Number of active HTTP/SSE connections currently handled by the server",
 )
 
 
@@ -49,11 +49,11 @@ async def metrics_middleware(
         return await call_next(request)
 
     method = request.method
-    
+
     # 锁定活跃连接，支持防脑裂挂盘观测
     ACTIVE_CONNECTIONS.inc()
     start_time = time.perf_counter()
-    
+
     try:
         response = await call_next(request)
         status = str(response.status_code)
@@ -63,7 +63,7 @@ async def metrics_middleware(
     finally:
         ACTIVE_CONNECTIONS.dec()
         duration = time.perf_counter() - start_time
-        
+
         # 记录指标
         API_REQUESTS_TOTAL.labels(method=method, endpoint=path, status=status).inc()
         API_REQUEST_DURATION.labels(method=method, endpoint=path).observe(duration)

@@ -67,7 +67,7 @@ def decode_token(token: str) -> Tuple[dict[str, Any], Optional[str]]:
     # 先尝试当前密钥
     try:
         payload = jwt.decode(token, _CURRENT, algorithms=[ALGORITHM])
-        
+
         # 法典 1.6: 双轨无感轮转 (超过 50% 寿命自动签发新 Token)
         exp = payload.get("exp")
         iat = payload.get("iat")
@@ -80,7 +80,7 @@ def decode_token(token: str) -> Tuple[dict[str, Any], Optional[str]]:
                     use_current_secret=True,
                 )
                 return payload, new_token
-        
+
         return payload, None
     except jwt.InvalidTokenError:
         pass

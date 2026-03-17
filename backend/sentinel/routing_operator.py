@@ -6,6 +6,7 @@ K3s 级动态路由控制器 (Routing Operator)
 2. Dynamic Compilation (动态编译): 当发生变化时，写入 routes.json 并调用 compiler.py 渲染全新 Caddyfile。
 3. API Reload (热更新): 将新渲染的 Caddyfile 通过 HTTP 原生 API 推送给 Caddy 节点，实现绝对零停机 (Zero-Downtime)。
 """
+
 import asyncio
 import hashlib
 import json
@@ -13,19 +14,19 @@ import logging
 import os
 import subprocess
 from pathlib import Path
+
 import httpx
 import redis.asyncio as aioredis
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [ROUTING-OPERATOR] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] [ROUTING-OPERATOR] %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # 配置硬编码，但在实际运行中会依赖系统级 yaml/env 的挂载
 # 这里的端口只是模拟，实际系统中 Jellyfin 通常是 8096, Frigate 5000, Ollama 11434
-DEFAULT_PORTS = {
-    "media": "8096",
-    "vision": "5000",
-    "llm": "11434"
-}
+DEFAULT_PORTS = {"media": "8096", "vision": "5000", "llm": "11434"}
+
 
 class RoutingOperator:
     def __init__(self):
@@ -33,7 +34,9 @@ class RoutingOperator:
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
         self.redis_password = os.getenv("REDIS_PASSWORD", None)
         self.project_root = Path(__file__).resolve().parent.parent.parent
-        self.caddy_api_url = "http://127.0.0.1:2019/load" # 默认假设在宿主机能反向访问到 Caddy Admin
+        self.caddy_api_url = (
+            "http://127.0.0.1:2019/load"  # 默认假设在宿主机能反向访问到 Caddy Admin
+        )
         self.last_hash = ""
 
         # 读取编译器传给 .env 的硬编码字典
@@ -44,7 +47,7 @@ class RoutingOperator:
             self.switch_map = {
                 "media": "zen70-jellyfin",
                 "vision": "zen70-frigate",
-                "llm": "zen70-ollama"
+                "llm": "zen70-ollama",
             }
 
     async def _get_redis(self) -> aioredis.Redis:
@@ -52,7 +55,7 @@ class RoutingOperator:
             host=self.redis_host,
             port=self.redis_port,
             password=self.redis_password,
-            decode_responses=True
+            decode_responses=True,
         )
 
     async def _compile_routes(self, routes: list):
@@ -64,7 +67,12 @@ class RoutingOperator:
         compiler_script = self.project_root / "scripts" / "compiler.py"
         try:
             # 阻塞执行编译器，生成全新的 ./config/Caddyfile
-            subprocess.run([sys.executable, str(compiler_script)], cwd=str(self.project_root), check=True, capture_output=True)
+            subprocess.run(
+                [sys.executable, str(compiler_script)],
+                cwd=str(self.project_root),
+                check=True,
+                capture_output=True,
+            )
             logger.info("🟢 [Operator] The Compiler 成功渲染新拓扑至 Caddyfile")
         except subprocess.CalledProcessError as e:
             logger.error(f"🔴 [Operator] The Compiler 执行失败: {e.stderr.decode()}")
@@ -86,7 +94,7 @@ class RoutingOperator:
                     self.caddy_api_url,
                     headers={"Content-Type": "text/caddyfile"},
                     content=caddyfile_data,
-                    timeout=5.0
+                    timeout=5.0,
                 )
             if res.status_code == 200:
                 logger.info("🟢 [Operator] Caddy 热更 API 调用成功 (Zero-Downtime Reload)!")
@@ -98,21 +106,23 @@ class RoutingOperator:
     async def spin_loop(self):
         logger.info("🚀 Routing Operator K3s-Controller 已就绪...")
         import sys
-        
+
         while True:
             try:
                 r = await self._get_redis()
                 current_routes = []
-                
+
                 for switch_key, container_name in self.switch_map.items():
                     # Watch: 探究当前意图状态 (可能被 Taint 影响，或者被用户彻底关停)
                     state = await r.get(f"switch_expected:{switch_key}")
                     if state == "ON":
                         target_port = DEFAULT_PORTS.get(switch_key, "80")
-                        current_routes.append({
-                            "path": f"/{switch_key}/*",
-                            "target": f"{container_name}:{target_port}"
-                        })
+                        current_routes.append(
+                            {
+                                "path": f"/{switch_key}/*",
+                                "target": f"{container_name}:{target_port}",
+                            }
+                        )
 
                 await r.aclose()
 
@@ -126,16 +136,18 @@ class RoutingOperator:
                         # 对于内部嵌套的缺库补充，强制导包
                         global sys
                         import sys
+
                         await self._compile_routes(current_routes)
                         await self._reload_caddy()
                         self.last_hash = routes_hash
                     except Exception as e:
                         logger.error(f"[Operator] 调谐期崩溃: {e}")
-                
+
             except Exception as e:
                 logger.debug(f"Operator loop issue: {e}")
-                
-            await asyncio.sleep(5) # 避坑：死循环非常吃 CPU，严格防卫 5 秒间隔
+
+            await asyncio.sleep(5)  # 避坑：死循环非常吃 CPU，严格防卫 5 秒间隔
+
 
 if __name__ == "__main__":
     op = RoutingOperator()

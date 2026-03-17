@@ -12,7 +12,7 @@ import datetime
 import uuid
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, Integer, JSON
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,29 +24,34 @@ class FamilyMessage(Base):
     极简家族留言板数据模型。
     启用了 tenant_id 用于 RLS 硬隔离。
     """
+
     __tablename__ = "family_messages"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[str] = mapped_column(String(64), nullable=False, default="default", index=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="default", index=True
+    )
     author_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    
+
     # 留言正文，支持纯文本或简易 Markdown
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    
+
     # 附加元数据（如前端传来的图片缩略图引用, tag 等）
     meta_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    
+
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.utcnow, nullable=False, index=True
     )
     updated_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
     )
 
     # 延迟加载作者信息，前端需要展示头像/名字
     author: Mapped["User"] = relationship("User", lazy="joined")
-

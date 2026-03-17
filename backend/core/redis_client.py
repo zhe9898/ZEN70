@@ -34,12 +34,12 @@ CHANNEL_BOARD_EVENTS = "board:events"
 # -------------------- 日志（复用集中模块） --------------------
 from backend.core.structured_logging import get_logger
 
-
 # -------------------- 数据结构 (TypedDict) --------------------
 
 
 class Capability(TypedDict, total=False):
     """单个能力描述。"""
+
     endpoint: str
     models: Optional[List[str]]
     status: str  # online/offline/unknown
@@ -48,6 +48,7 @@ class Capability(TypedDict, total=False):
 
 class NodeInfo(TypedDict, total=False):
     """节点信息。"""
+
     node_id: str
     hostname: str
     role: str  # master/worker
@@ -60,6 +61,7 @@ class NodeInfo(TypedDict, total=False):
 
 class SwitchState(TypedDict, total=False):
     """软开关状态。"""
+
     state: str  # ON/OFF/PENDING
     reason: Optional[str]
     updated_at: float
@@ -68,6 +70,7 @@ class SwitchState(TypedDict, total=False):
 
 class HardwareState(TypedDict, total=False):
     """硬件状态（与探针写入格式一致）。"""
+
     path: str
     uuid: Optional[str]
     state: str  # online/offline/pending
@@ -281,7 +284,11 @@ class RedisClient:
             keys = await self._redis.keys(f"{KEY_NODE_PREFIX}*")
             result: Dict[str, NodeInfo] = {}
             for key in keys:
-                nid = key[len(KEY_NODE_PREFIX):] if key.startswith(KEY_NODE_PREFIX) else key.split(":")[-1]
+                nid = (
+                    key[len(KEY_NODE_PREFIX) :]
+                    if key.startswith(KEY_NODE_PREFIX)
+                    else key.split(":")[-1]
+                )
                 node = await self.get_node(nid)
                 if node:
                     result[nid] = node
@@ -335,17 +342,21 @@ class RedisClient:
             keys = await self._redis.keys(f"{KEY_SWITCH_PREFIX}*")
             if not keys:
                 return {}
-            
+
             result: Dict[str, SwitchState] = {}
             # 使用 pipeline 批量获取所有开关信息以提升性能
             pipe = self._redis.pipeline()
             for key in keys:
                 pipe.hgetall(key)
             results = await pipe.execute()
-            
+
             for key, data in zip(keys, results):
                 if data:
-                    name = key[len(KEY_SWITCH_PREFIX):] if key.startswith(KEY_SWITCH_PREFIX) else key.split(":")[-1]
+                    name = (
+                        key[len(KEY_SWITCH_PREFIX) :]
+                        if key.startswith(KEY_SWITCH_PREFIX)
+                        else key.split(":")[-1]
+                    )
                     result[name] = {
                         "state": data.get("state", ""),
                         "reason": data.get("reason"),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import factory
+
 from backend.worker.alert_manager import AlertPayload
 
 

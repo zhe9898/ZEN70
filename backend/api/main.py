@@ -16,25 +16,24 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from fastapi import HTTPException
 
-from backend.api import routes
-from backend.api import auth as auth_router
 from backend.api import assets as assets_router
-from backend.api import media as media_router
-from backend.api import settings as settings_router
-from backend.api import search as search_router
+from backend.api import auth as auth_router
 from backend.api import iot as iot_router
+from backend.api import media as media_router
 from backend.api import portability as portability_router
 from backend.api import push as push_router
-from backend.worker import alert_manager as alert_router
+from backend.api import routes
+from backend.api import search as search_router
+from backend.api import settings as settings_router
 from backend.api.deps import get_redis, get_settings
 from backend.api.models import ErrorResponse, HealthResponse
 from backend.core.redis_client import RedisClient, get_logger
+from backend.worker import alert_manager as alert_router
 
 # -------------------- 日志 --------------------
 logger = get_logger("api")
@@ -125,7 +124,13 @@ async def add_request_id_and_log(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{duration:.3f}"
     logger.info(
         f"{request.method} {request.url.path} {response.status_code} {duration:.3f}s",
-        extra={"request_id": request_id, "method": request.method, "path": request.url.path, "status_code": response.status_code, "duration": duration},
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration": duration,
+        },
     )
     return response
 
@@ -186,7 +191,9 @@ async def health_check(request: Request):
         services["redis"] = "error"
     try:
         postgres_dsn = get_settings().get("postgres_dsn")
-        services["postgres"] = await asyncio.wait_for(_check_postgres_async(postgres_dsn), timeout=2.0)
+        services["postgres"] = await asyncio.wait_for(
+            _check_postgres_async(postgres_dsn), timeout=2.0
+        )
     except asyncio.TimeoutError:
         services["postgres"] = "timeout"
     status = "healthy" if services.get("redis") == "ok" else "unhealthy"

@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from backend.models.user import Base
 
@@ -63,8 +63,9 @@ async def init_db() -> None:
     async with _engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
-        
+
     # (ZEN70) 强行下发并行级安全底座
     from backend.core.rls import apply_rls_policies
+
     async with _async_session_factory() as session:
         await apply_rls_policies(session)

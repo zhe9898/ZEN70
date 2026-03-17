@@ -5,33 +5,36 @@
 # WARNING: Auto-generated core module. Manual modifications may be overwritten by IaC compiler.
 #
 # ZEN70 核心 API 网关 (FastAPI)。
-# 
+#
 # 红线合规：FastAPI + Pydantic v2 | SSE 心跳 45s cancel | LRU 缓存 TTL 30s |
 # 统一错误码含 recovery_hint | PENDING_MAINTENANCE 熔断 503 | 纯动态 UPS 熔断
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+import logging
 import os
+import sqlite3
 import time
 import uuid
-import sqlite3
-import hashlib
-from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Any, Dict
-import logging
-import json
-import httpx
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict
+
+import httpx
+
 
 # 阶段八：任务0 - 全局时间线对齐 (Global Time Alignment)
 class UTCFormatter(logging.Formatter):
-    
+
     def formatTime(self, record, datefmt=None):
         dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
         if datefmt:
             return dt.strftime(datefmt)
-        return dt.isoformat(timespec='milliseconds')
+        return dt.isoformat(timespec="milliseconds")
+
 
 _log_fmt = logging.Formatter("%(asctime)s [%(levelname)s] [%(trace_id)s] [GATEWAY] %(message)s")
 __utc_fmt = UTCFormatter("%(asctime)s [%(levelname)s] [%(trace_id)s] [GATEWAY] %(message)s")
@@ -44,37 +47,43 @@ for handler in root_logger.handlers:
 
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, Request, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError, HTTPException
-from backend.api.deps import get_current_user_optional
-from pydantic import BaseModel, Field
-from prometheus_client import make_asgi_app
-
-from backend.core.metrics import metrics_middleware
-from starlette.middleware.base import BaseHTTPMiddleware
+import contextvars
 import subprocess
 from pathlib import Path
+
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from prometheus_client import make_asgi_app
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
-import contextvars
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from backend.api.deps import get_current_user_optional
+from backend.core.metrics import metrics_middleware
 
 # 阶段八：任务1 - API 边缘层注射 TraceID (使用 contextvars 避免并发污染)
 _trace_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="NO-TRACE")
 
 old_factory = logging.getLogRecordFactory()
+
+
 def record_factory(*args, **kwargs):
     record = old_factory(*args, **kwargs)
     setattr(record, "trace_id", _trace_id_ctx.get())
     return record
+
+
 logging.setLogRecordFactory(record_factory)
+
 
 class TraceIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # 如果上游（如 Caddy/Cloudflare）已传，则复用；否则生成新 UUID4
         trace_id = request.headers.get("X-Trace-Id") or uuid.uuid4().hex
         request.state.trace_id = trace_id
-        
+
         # 将 trace_id 绑定到安全的协程上下文
         token = _trace_id_ctx.set(trace_id)
         try:
@@ -83,6 +92,7 @@ class TraceIDMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             _trace_id_ctx.reset(token)
+
 
 try:
     import redis.asyncio as redis
@@ -104,6 +114,7 @@ _sse_last_ping: Dict[str, float] = {}
 
 class ErrorResponse(BaseModel):
     """统一错误码契约：废除模糊 500，含 recovery_hint。"""
+
     code: str = Field(..., description="ZEN-xxx 错误码")
     message: str = Field(..., description="用户可读说明")
     recovery_hint: str = Field(..., description="恢复建议，供前端渲染操作按钮")
@@ -112,6 +123,7 @@ class ErrorResponse(BaseModel):
 
 class CapabilityItem(BaseModel):
     """单个能力：status=online 则 enabled，PENDING_MAINTENANCE 则 disabled。"""
+
     status: str = Field(..., description="online | pending_maintenance | unknown")
     enabled: bool = Field(..., description="是否可交互")
     endpoint: str | None = Field(None, description="绑定的内网或外网端点")
@@ -208,18 +220,18 @@ async def get_capabilities_matrix(request: Request) -> Dict[str, CapabilityItem]
     # 彻底解耦面板硬编码，让 Restic 引擎配置无感映射到前端开关。
     backup_enabled = os.getenv("BACKUP_ENABLED", "true").lower() == "true"
     matrix["容灾备份"] = CapabilityItem(
-            status="online" if backup_enabled else "offline",
-            enabled=True,
-            models=["Restic引擎", "S3对象锁定"],
-            reason="安全级别: Critical" if backup_enabled else "已被系统基线 (system.yaml) 拦截关闭",
+        status="online" if backup_enabled else "offline",
+        enabled=True,
+        models=["Restic引擎", "S3对象锁定"],
+        reason="安全级别: Critical" if backup_enabled else "已被系统基线 (system.yaml) 拦截关闭",
     )
-    
+
     # [AbsDecoupling Audit] Injecting mock test service to verify Vue v-for dynamic rendering.
     matrix["Ghost Protocol Test"] = CapabilityItem(
-            status="online",
-            enabled=True,
-            models=["Mock_AI_V1"],
-            reason="Absolute Decoupling Verification",
+        status="online",
+        enabled=True,
+        models=["Mock_AI_V1"],
+        reason="Absolute Decoupling Verification",
     )
 
     _lru_cache = {"matrix": matrix, "topology_raw": topology}
@@ -258,18 +270,20 @@ BITROT_DB_PATH = Path("/app/data/bitrot.db") if Path("/app").exists() else Path(
 _bitrot_dirs_raw = os.getenv("BITROT_SCAN_DIRS", "")
 BITROT_SCAN_DIRS = [p.strip() for p in _bitrot_dirs_raw.split(",") if p.strip()]
 
+
 def _init_bitrot_db():
     conn = sqlite3.connect(BITROT_DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS file_hashes (
             filepath TEXT PRIMARY KEY,
             sha256 TEXT NOT NULL,
             last_checked REAL NOT NULL
         )
-    ''')
+    """)
     conn.commit()
     conn.close()
+
 
 async def bitrot_worker():
     """法典 3.2.3: 后台巡检冷数据，低优先级 hashing。仅启动时和每24小时运行。"""
@@ -277,13 +291,13 @@ async def bitrot_worker():
         # 给系统启动留出缓冲期
         await asyncio.sleep(60)
         _init_bitrot_db()
-        
+
         while True:
             # 法典要求：利用低优先级检测。此处简单模拟，避免高频 I/O。
             conn = sqlite3.connect(BITROT_DB_PATH)
             cursor = conn.cursor()
             now = time.time()
-            
+
             for directory in BITROT_SCAN_DIRS:
                 dir_path = Path(directory)
                 if not dir_path.exists():
@@ -293,7 +307,7 @@ async def bitrot_worker():
                         filepath = Path(root) / file
                         if not filepath.exists() or not filepath.is_file():
                             continue
-                            
+
                         # 低优先级哈希计算 (避免阻塞事件循环，使用 thread_pool)
                         def compute_hash() -> str:
                             sha256_hash = hashlib.sha256()
@@ -302,20 +316,20 @@ async def bitrot_worker():
                                 for byte_block in iter(lambda: f.read(4096), b""):
                                     sha256_hash.update(byte_block)
                             return sha256_hash.hexdigest()
-                            
+
                         try:
                             file_hash = await asyncio.to_thread(compute_hash)
                             cursor.execute(
-                                "SELECT sha256 FROM file_hashes WHERE filepath = ?", 
-                                (str(filepath),)
+                                "SELECT sha256 FROM file_hashes WHERE filepath = ?",
+                                (str(filepath),),
                             )
                             row = cursor.fetchone()
-                            
+
                             if row is None:
                                 # 首次记录基线
                                 cursor.execute(
                                     "INSERT INTO file_hashes (filepath, sha256, last_checked) VALUES (?, ?, ?)",
-                                    (str(filepath), file_hash, now)
+                                    (str(filepath), file_hash, now),
                                 )
                             else:
                                 if row[0] != file_hash:
@@ -329,14 +343,14 @@ async def bitrot_worker():
                                 else:
                                     cursor.execute(
                                         "UPDATE file_hashes SET last_checked = ? WHERE filepath = ?",
-                                        (now, str(filepath))
+                                        (now, str(filepath)),
                                     )
                             conn.commit()
                             # 每个文件计算后主动让出事件循环并延时，绝对防霸占 CPU
                             await asyncio.sleep(0.5)
                         except Exception as e:
                             pass
-            
+
             conn.close()
             # 24 小时巡检一次
             await asyncio.sleep(86400)
@@ -349,12 +363,15 @@ async def bitrot_worker():
 _microservices_health_urls: Dict[str, str] = {}
 try:
     urls_raw = os.getenv("MICROSERVICE_HEALTH_URLS", "{}")
-    if urls_raw: _microservices_health_urls = json.loads(urls_raw)
-except Exception: pass
+    if urls_raw:
+        _microservices_health_urls = json.loads(urls_raw)
+except Exception:
+    pass
 
 # 状态字典
 service_readiness: Dict[str, bool] = {}
 _service_liveness_fails: Dict[str, int] = {}
+
 
 async def health_probe_worker():
     """定期执行微服务探针: Liveness 连续失败 3 次强杀重启; Readiness 封锁进站流量。"""
@@ -362,7 +379,7 @@ async def health_probe_worker():
     async with httpx.AsyncClient(timeout=2.0) as client:
         while True:
             r = await _get_redis()
-            
+
             for svc_name, health_url in _microservices_health_urls.items():
                 is_ok = False
                 try:
@@ -371,30 +388,35 @@ async def health_probe_worker():
                         is_ok = True
                 except Exception:
                     pass
-                
+
                 if is_ok:
                     service_readiness[svc_name] = True
                     _service_liveness_fails[svc_name] = 0
                 else:
                     service_readiness[svc_name] = False
                     _service_liveness_fails[svc_name] = _service_liveness_fails.get(svc_name, 0) + 1
-                    
+
                     if _service_liveness_fails[svc_name] >= 3:
-                        logger.error(f"Liveness Probe failed 3 times for {svc_name}. Emitting kill signal.")
+                        logger.error(
+                            f"Liveness Probe failed 3 times for {svc_name}. Emitting kill signal."
+                        )
                         # 通知控制平面(Sentinel) 介入强杀与驱逐
                         if r is not None:
                             try:
                                 event = {
                                     "switch": svc_name,
                                     "state": "RESTART",
-                                    "reason": "liveness_failed_3_times"
+                                    "reason": "liveness_failed_3_times",
                                 }
                                 await r.publish("switch:events", json.dumps(event))
-                            except Exception: pass
-                        _service_liveness_fails[svc_name] = 0 # 重置计数，避免反复狂杀
+                            except Exception:
+                                pass
+                        _service_liveness_fails[svc_name] = 0  # 重置计数，避免反复狂杀
 
-            if r is not None: await r.aclose()
+            if r is not None:
+                await r.aclose()
             await asyncio.sleep(10)
+
 
 # -------------------- Lifespan --------------------
 @asynccontextmanager
@@ -418,6 +440,7 @@ app = FastAPI(
 )
 
 from .ai_router import router as ai_router
+
 app.include_router(ai_router)
 
 # 注册 Prometheus ASGI 指标暴露端点
@@ -433,11 +456,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Trace-Id"]
+    expose_headers=["X-Trace-Id"],
 )
 
 # Phase 8 TraceID Middleware
 app.add_middleware(TraceIDMiddleware)
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -448,16 +472,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     trace_id = getattr(request.state, "trace_id", "unknown")
     logger.error(f"HTTP异常 拦截: {exc.status_code} - {exc.detail} - TraceID: {trace_id}")
     return JSONResponse(
-            status_code=exc.status_code,
-            content=ErrorResponse( # type: ignore
-                code=f"HTTP-{exc.status_code}",
-                message=str(exc.detail),
-                recovery_hint="自动刷新前端页面或人工检查控制台网络面板",
-                details={
-                    "trace_id": trace_id
-                }
-            ).model_dump()
-        )
+        status_code=exc.status_code,
+        content=ErrorResponse(  # type: ignore
+            code=f"HTTP-{exc.status_code}",
+            message=str(exc.detail),
+            recovery_hint="自动刷新前端页面或人工检查控制台网络面板",
+            details={"trace_id": trace_id},
+        ).model_dump(),
+    )
+
 
 @app.middleware("http")
 async def global_readonly_lock(request: Request, call_next):
@@ -469,7 +492,7 @@ async def global_readonly_lock(request: Request, call_next):
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         # 我们优先读 _lru_cache 以避免每次写入都拉取 Redis
         matrix = _lru_cache.get("matrix")
-        
+
         # 如果缓存为空，说明刚启动或者被清空，主动拉取一次兜底
         if matrix is None:
             # 由于不能直接在 middleware 轻易注入依赖，我们手写轻量获取
@@ -479,19 +502,19 @@ async def global_readonly_lock(request: Request, call_next):
                     val = await r.get("zen70:topology:ups")
                     await r.aclose()
                     if val and val.strip().upper() == "LOW_BATTERY_SHUTDOWN":
-                         return JSONResponse(
-                             status_code=503,
-                             content=ErrorResponse(
-                                 code="ZEN-SYS-9999",
-                                 message="市电中断且电池告警，系统已进入全局强制只读模式保护硬件",
-                                 recovery_hint="等待市电恢复后，网关将自动解除锁定放行写入",
-                                 details={
-                                     "method": request.method, 
-                                     "url": str(request.url),
-                                     "trace_id": getattr(request.state, "trace_id", "unknown")
-                                 },
-                             ).model_dump()
-                         )
+                        return JSONResponse(
+                            status_code=503,
+                            content=ErrorResponse(
+                                code="ZEN-SYS-9999",
+                                message="市电中断且电池告警，系统已进入全局强制只读模式保护硬件",
+                                recovery_hint="等待市电恢复后，网关将自动解除锁定放行写入",
+                                details={
+                                    "method": request.method,
+                                    "url": str(request.url),
+                                    "trace_id": getattr(request.state, "trace_id", "unknown"),
+                                },
+                            ).model_dump(),
+                        )
             except Exception:
                 pass
         else:
@@ -504,13 +527,13 @@ async def global_readonly_lock(request: Request, call_next):
                         message="市电中断且电池告警，系统已进入全局强制只读模式保护硬件",
                         recovery_hint="等待市电恢复后，网关将自动解除锁定放行写入",
                         details={
-                            "method": request.method, 
+                            "method": request.method,
                             "url": str(request.url),
-                            "trace_id": getattr(request.state, "trace_id", "unknown")
+                            "trace_id": getattr(request.state, "trace_id", "unknown"),
                         },
-                    ).model_dump()
+                    ).model_dump(),
                 )
-            
+
     # 如果正常，或者只是 GET 请求，继续 Readiness 拦截
     # Readiness 拦截保护: 服务没有跑完模型加载等初始流程前，禁止流量切入 (这里用 path 前缀简单模拟路由隔离)
     path_str = str(request.url.path)
@@ -526,9 +549,9 @@ async def global_readonly_lock(request: Request, call_next):
                         recovery_hint="请等待模型拉起完毕或节点自愈",
                         details={
                             "service": svc_name,
-                            "trace_id": getattr(request.state, "trace_id", "unknown")
-                        }
-                    ).model_dump()
+                            "trace_id": getattr(request.state, "trace_id", "unknown"),
+                        },
+                    ).model_dump(),
                 )
 
     response = await call_next(request)
@@ -537,6 +560,7 @@ async def global_readonly_lock(request: Request, call_next):
 
 # 法典 7：禁止 API 无大小限制；有 Content-Length 时拒绝超限请求
 MAX_REQUEST_BODY_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", "10485760"))  # 10MB
+
 
 @app.middleware("http")
 async def limit_request_body(request: Request, call_next):
@@ -554,7 +578,7 @@ async def limit_request_body(request: Request, call_next):
                         recovery_hint=f"请求体不得超过 {MAX_REQUEST_BODY_BYTES // (1024*1024)} MB",
                         details={
                             "max_bytes": MAX_REQUEST_BODY_BYTES,
-                            "trace_id": getattr(request.state, "trace_id", "unknown")
+                            "trace_id": getattr(request.state, "trace_id", "unknown"),
                         },
                     ).model_dump(),
                 )
@@ -586,7 +610,7 @@ async def http_handler(request: Request, exc: HTTPException):
             recovery_hint="检查请求参数后重试",
             details={
                 "request_id": getattr(request.state, "request_id", ""),
-                "trace_id": getattr(request.state, "trace_id", "unknown")
+                "trace_id": getattr(request.state, "trace_id", "unknown"),
             },
         ).model_dump(),
     )
@@ -602,7 +626,7 @@ async def validation_handler(request: Request, exc: RequestValidationError):
             recovery_hint="请检查请求体格式与必填字段",
             details={
                 "errors": exc.errors(),
-                "trace_id": getattr(request.state, "trace_id", "unknown")
+                "trace_id": getattr(request.state, "trace_id", "unknown"),
             },
         ).model_dump(),
     )
@@ -626,10 +650,10 @@ async def global_handler(request: Request, exc: Exception):
 
 # -------------------- 路由 --------------------
 
+
 @app.get("/api/v1/capabilities", response_model=Dict[str, CapabilityItem])
 async def capabilities(
-    request: Request,
-    current_user: dict | None = Depends(get_current_user_optional)
+    request: Request, current_user: dict | None = Depends(get_current_user_optional)
 ):
     """
     法典 2.3.1：返回能力矩阵，供前端 v-for 动态渲染。
@@ -655,6 +679,7 @@ async def capabilities(
 
 class PingRequest(BaseModel):
     """Ping 请求体：前端每 30s 调用，防 45s 超时 cancel。"""
+
     connection_id: str = Field(..., description="SSE 连接建立时下发的 ID")
 
 
@@ -765,6 +790,7 @@ async def media_status(request: Request):
 
 class ShredRequest(BaseModel):
     """法典 3.3.2 - 数据可携带权与安全剿灭"""
+
     file_path: str = Field(..., description="宿主机或容器内待物理粉碎的绝对路径")
 
 
@@ -776,7 +802,7 @@ async def secure_shredding(request: Request, body: ShredRequest):
     执行 3 次随机覆写并以零结尾，确保数据不可物理恢复。
     """
     target = Path(body.file_path)
-    
+
     if not target.exists() or not target.is_file():
         raise HTTPException(
             status_code=404,
@@ -785,7 +811,7 @@ async def secure_shredding(request: Request, body: ShredRequest):
                 message="目标文件不存在或不是标准文件",
                 recovery_hint="请检查路径是否正确传递",
                 details={"path": str(target)},
-            ).model_dump()
+            ).model_dump(),
         )
 
     # 异步执行，包裹 try-except，按法典抛出标准错误结构
@@ -795,16 +821,21 @@ async def secure_shredding(request: Request, body: ShredRequest):
         # -z: 最后用 0 填充以隐藏覆写痕迹
         # -n 3: 覆写 3 次
         process = await asyncio.create_subprocess_exec(
-            "shred", "-u", "-z", "-n", "3", str(target),
+            "shred",
+            "-u",
+            "-z",
+            "-n",
+            "3",
+            str(target),
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
         )
         stdout, stderr = await process.communicate()
-        
+
         if process.returncode != 0:
             logger_err = stderr.decode().strip()
             raise Exception(f"Shred command failed: {logger_err}")
-            
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -813,7 +844,7 @@ async def secure_shredding(request: Request, body: ShredRequest):
                 message="底层安全粉碎执行失败",
                 recovery_hint="检查容器是否具备执行 shred 的权限，或目标文件是否被占用",
                 details={"error_msg": str(e), "path": str(target)},
-            ).model_dump()
+            ).model_dump(),
         )
 
     return {"status": "success", "message": f"文件 {target.name} 已彻底物理粉碎并擦除残留痕迹"}
@@ -821,5 +852,5 @@ async def secure_shredding(request: Request, body: ShredRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
 
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

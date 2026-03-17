@@ -1,6 +1,7 @@
-import pytest
 import sys
 from io import StringIO
+
+import pytest
 
 if __name__ == "__main__":
     out = StringIO()

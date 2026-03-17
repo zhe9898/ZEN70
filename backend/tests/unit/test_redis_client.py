@@ -7,8 +7,8 @@
 
 from __future__ import annotations
 
-import os
 import asyncio
+import os
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,10 +23,10 @@ if pytest_asyncio is None:
     pytestmark = pytest.mark.skip(reason="pytest-asyncio not installed")
 else:
     from backend.core.redis_client import (
-        RedisClient,
         Capability,
-        SwitchState,
         NodeInfo,
+        RedisClient,
+        SwitchState,
     )
 
 

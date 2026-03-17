@@ -1,18 +1,22 @@
 import asyncio
+import io
 import logging
 import os
-import io
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from PIL import Image
 from pathlib import Path
 
+from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 # 1. 初始化日志
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("ai_worker")
 
 model_instance = None
 HAS_MODEL = True
+
 
 def get_model():
     global model_instance, HAS_MODEL
@@ -20,8 +24,11 @@ def get_model():
         return model_instance
     try:
         from sentence_transformers import SentenceTransformer
+
         MODEL_NAME = "clip-ViT-B-32-multilingual-v1"
-        logger.info(f"Loading {MODEL_NAME} model into memory... (This may take a while and ~2GB RAM)")
+        logger.info(
+            f"Loading {MODEL_NAME} model into memory... (This may take a while and ~2GB RAM)"
+        )
         model_instance = SentenceTransformer(MODEL_NAME)
         logger.info("Model loaded successfully.")
         HAS_MODEL = True
@@ -31,9 +38,11 @@ def get_model():
         HAS_MODEL = False
         return None
 
+
 # 3. 数据库连接串 (直接复用主干的 asyncpg DSN)
 # 这里为了物理脱离 FastAPI 主进程，自己创建独立的 Engine
 from dotenv import load_dotenv
+
 load_dotenv()
 
 DB_DSN = os.getenv("POSTGRES_DSN")
@@ -48,6 +57,7 @@ AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 # 需要延迟导入 Asset 模型，或者在这里声明简化版 ORM 进行查改
 from backend.models.asset import Asset
 
+
 async def process_pending_assets():
     """定期轮询数据库扫描还未进行向量嵌入的照片，并逐个消化。"""
     async with AsyncSessionLocal() as session:
@@ -56,19 +66,19 @@ async def process_pending_assets():
             select(Asset).where(Asset.embedding_status == "pending").limit(10)
         )
         assets = result.scalars().all()
-        
+
         if not assets:
             return 0  # 没有任务
 
         logger.info(f"Found {len(assets)} pending assets to process.")
-        
+
         processed_count = 0
         for asset in assets:
             try:
                 # 状态先行锁定：防并发重复处理
                 asset.embedding_status = "processing"
                 await session.commit()
-                
+
                 model = get_model()
                 if not HAS_MODEL or model is None:
                     # 如果没有装模型，直接标记跳过
@@ -89,23 +99,30 @@ async def process_pending_assets():
                         logger.info(f"Successfully vectorized image Asset ID: {asset.id}")
                     else:
                         asset.embedding_status = "failed"
-                        asset.media_metadata = {**asset.media_metadata, "error": "File not found on disk"}
+                        asset.media_metadata = {
+                            **asset.media_metadata,
+                            "error": "File not found on disk",
+                        }
                         logger.warning(f"File not found for Asset ID: {asset.id}")
                 else:
                     # 视频等类型暂时先标记 failed 或跳过 (需抽帧)
                     asset.embedding_status = "failed"
-                    asset.media_metadata = {**asset.media_metadata, "error": "Asset type not supported yet"}
-                
+                    asset.media_metadata = {
+                        **asset.media_metadata,
+                        "error": "Asset type not supported yet",
+                    }
+
                 await session.commit()
                 processed_count += 1
-                
+
             except Exception as e:
                 logger.error(f"Error processing asset {asset.id}: {e}")
                 asset.embedding_status = "failed"
                 asset.media_metadata = {**asset.media_metadata, "error": str(e)}
                 await session.commit()
-                
+
         return processed_count
+
 
 async def main():
     logger.info("ZEN70 AI Vision/Semantic Background Worker Started.")
@@ -122,6 +139,7 @@ async def main():
         except Exception as e:
             logger.error(f"Worker Loop Exception: {e}")
             await asyncio.sleep(5)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

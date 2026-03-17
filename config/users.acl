@@ -1,6 +1,6 @@
 # 默认用户禁止登录并禁用危险指令
 user default off nopass nocommands
 # 后台边缘低权限只读账密，用于探针/挂载器
-user readonly on >scApNcZAUydBmrqUea8QSQ ~zen70:* &zen70:* +@read -@write +ping +info
+user readonly on >2c-9vZ4HQzcP4tPNRIB20Q ~zen70:* &zen70:* +@read -@write +ping +info
 # 核心网关全量特权
 user zen70_gateway on >DIu3fxjhZhGY1-3tlN-H_SS1HvGP0hcPRKwl9EMw1lU ~* &* +@all

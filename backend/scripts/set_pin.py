@@ -30,7 +30,10 @@ def _hash_pin(pin: str, rounds: int = 12) -> str:
 
 async def _main() -> None:
     if len(sys.argv) != 3:
-        print("Usage: PYTHONPATH=. python backend/scripts/set_pin.py <username> <6-digit-PIN>", file=sys.stderr)
+        print(
+            "Usage: PYTHONPATH=. python backend/scripts/set_pin.py <username> <6-digit-PIN>",
+            file=sys.stderr,
+        )
         sys.exit(2)
     username, pin = sys.argv[1], sys.argv[2]
     if len(pin) != 6 or not pin.isdigit():

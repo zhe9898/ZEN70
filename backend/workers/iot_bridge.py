@@ -12,18 +12,19 @@ ZEN70 V3.0 物联指令高速双向泵送器 (IoT Bridge Worker)
 """
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
 import signal
 import uuid
-from typing import Dict
 from datetime import datetime, timezone
-import contextvars
+from typing import Dict
 
 import redis.asyncio as aioredis
+from paho.mqtt.client import CallbackAPIVersion
 from paho.mqtt.client import Client as MQTTClient
-from paho.mqtt.client import MQTTMessage, CallbackAPIVersion
+from paho.mqtt.client import MQTTMessage
 
 
 # 阶段八：任务0 - 全局时间线对齐 (Global Time Alignment)
@@ -35,14 +36,10 @@ class UTCFormatter(logging.Formatter):
         return dt.isoformat(timespec="milliseconds")
 
 
-__utc_fmt = UTCFormatter(
-    "%(asctime)s - %(name)s - [%(levelname)s] [%(trace_id)s] - %(message)s"
-)
+__utc_fmt = UTCFormatter("%(asctime)s - %(name)s - [%(levelname)s] [%(trace_id)s] - %(message)s")
 
 # 阶段八：任务1/3 - Worker Context TraceID 透传
-_trace_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "trace_id", default="NO-TRACE"
-)
+_trace_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="NO-TRACE")
 old_factory = logging.getLogRecordFactory()
 
 
@@ -67,9 +64,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
-MQTT_PORT = int(
-    os.getenv("MQTT_PORT", "1883")
-)  # TODO: Check if 8883 is active and mount certs
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))  # TODO: Check if 8883 is active and mount certs
 MQTT_USER = os.getenv("MQTT_USER", None)
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
 
@@ -116,9 +111,7 @@ class IoTBridgeWorker:
     def init_mqtt(self):
         """初始化 MQTT 客户端（同步库由于轻量直接使用，生产环境可采用 HBMQTT/gmqtt）"""
         client_id = f"zen70-bridge-{uuid.uuid4().hex[:8]}"
-        self.mqtt = MQTTClient(
-            CallbackAPIVersion.VERSION2, client_id=client_id
-        )  # 开启持久会话
+        self.mqtt = MQTTClient(CallbackAPIVersion.VERSION2, client_id=client_id)  # 开启持久会话
 
         if MQTT_USER and MQTT_PASSWORD:
             self.mqtt.username_pw_set(MQTT_USER, MQTT_PASSWORD)
@@ -133,9 +126,7 @@ class IoTBridgeWorker:
             self.mqtt.connect(MQTT_HOST, MQTT_PORT, 60)
             self.mqtt.loop_start()  # 启动后台静默线程处理收发
         except Exception as e:
-            logger.error(
-                f"🔴 [IoT Bridge] MQTT 连接失败 {MQTT_HOST}:{MQTT_PORT} -> {e}"
-            )
+            logger.error(f"🔴 [IoT Bridge] MQTT 连接失败 {MQTT_HOST}:{MQTT_PORT} -> {e}")
             raise
 
     def _on_mqtt_connect(self, client, userdata, flags, rc):
@@ -149,9 +140,7 @@ class IoTBridgeWorker:
 
     def _on_mqtt_disconnect(self, client, userdata, rc):
         if rc != 0:
-            logger.warning(
-                "🟠 [IoT Bridge] 意外断开 MQTT 连接，正在自动重连机制接管..."
-            )
+            logger.warning("🟠 [IoT Bridge] 意外断开 MQTT 连接，正在自动重连机制接管...")
 
     def _on_mqtt_message(self, client, userdata, msg: MQTTMessage):
         """截获设备端物理上报的反馈状态，推入事件循环进行 SSE 广播"""
@@ -179,9 +168,7 @@ class IoTBridgeWorker:
                         self._broadcast_sse_state(device_id, state), self.loop
                     )
                 else:
-                    logger.error(
-                        "🔴 [IoT Bridge] 致命系统冲突：异步事务引擎(Loop)未挂载！"
-                    )
+                    logger.error("🔴 [IoT Bridge] 致命系统冲突：异步事务引擎(Loop)未挂载！")
         except json.JSONDecodeError:
             pass  # 忽略非 JSON 报文
 
@@ -194,9 +181,7 @@ class IoTBridgeWorker:
             is_new = await self.redis.set(debounce_key, "1", nx=True, ex=2)
             if not is_new:
                 # 仍处于 2 秒冷却期，直接阻断不向上泵送
-                logger.debug(
-                    f"🟡 [IoT Bridge] SSE 泵送频率过高被截断 (Debounce hit): {device_id}"
-                )
+                logger.debug(f"🟡 [IoT Bridge] SSE 泵送频率过高被截断 (Debounce hit): {device_id}")
                 return
 
             await self.redis.set(f"zen70:iot:state:{device_id}", state)
@@ -204,9 +189,7 @@ class IoTBridgeWorker:
                 {"device_id": device_id, "state": state, "source": "hardware_ack"}
             )
             await self.redis.publish("zen70:sse:iot_updates", sse_payload)
-            logger.info(
-                f"🟢 [IoT Bridge] SSE 物理防抖确认已下发: {device_id} -> {state}"
-            )
+            logger.info(f"🟢 [IoT Bridge] SSE 物理防抖确认已下发: {device_id} -> {state}")
         except Exception as e:
             logger.error(f"[IoT Bridge] SSE 推流失败: {e}")
 
@@ -250,9 +233,7 @@ class IoTBridgeWorker:
         info.wait_for_publish()  # 等待 MQTT Broker 的 ACK（阻塞至抵达 Broker）
 
         if info.is_published():
-            logger.info(
-                f"🟢 [{trace_id}] [IoT Bridge] 指令抵达 MQTT 总线: {topic} -> {payload}"
-            )
+            logger.info(f"🟢 [{trace_id}] [IoT Bridge] 指令抵达 MQTT 总线: {topic} -> {payload}")
             # 标记为已处理
             await self.redis.xack(REDIS_STREAM_KEY, CONSUMER_GROUP, message_id)
         else:
@@ -260,9 +241,7 @@ class IoTBridgeWorker:
 
     async def spin_loop(self):
         """主消费循环 (XREADGROUP)"""
-        logger.info(
-            f"🚀 [IoT Bridge] Worker {CONSUMER_NAME} 已就绪，正在监听 Streams..."
-        )
+        logger.info(f"🚀 [IoT Bridge] Worker {CONSUMER_NAME} 已就绪，正在监听 Streams...")
 
         while self.running:
             try:
@@ -306,9 +285,7 @@ class IoTBridgeWorker:
                                     DLQ_STREAM_KEY, data, maxlen=10000, approximate=True
                                 )
                                 # 彻底放弃该消息
-                                await self.redis.xack(
-                                    REDIS_STREAM_KEY, CONSUMER_GROUP, message_id
-                                )
+                                await self.redis.xack(REDIS_STREAM_KEY, CONSUMER_GROUP, message_id)
                             else:
                                 # 更新重试次数并保留在 Pending 列表中（由单独回收协程处理）
                                 # 为了简便，此处也可以通过不 ack，并修改 payload 再次塞回头部

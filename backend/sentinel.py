@@ -3,9 +3,9 @@
 # @architecture-version: V2.0
 # @compliance: strict-sre-ruleset
 # WARNING: Auto-generated core module. Manual modifications may be overwritten by IaC compiler.
-# 
+#
 # ZEN70 拓扑监测探针 (Topology Sentinel)。
-# 
+#
 # 红线合规：滑动窗口防抖、三重交叉核验。
 # 零硬编码：动态感知 UPS 接入（通过 upsc 或 USB 探测），不依赖 system.yaml。
 from __future__ import annotations
@@ -34,6 +34,7 @@ POLL_INTERVAL = 5
 LOCK_TTL = 15  # 强制合规法典 2.1.4: 心跳中断超过 15 秒锁自动消散
 WINDOW_SIZE = 3
 
+
 # 挂载点配置：能力标签 -> (路径, 期望UUID可选, 最小剩余GB)。路径解耦：仅来自 .env（compiler 从 system.yaml 写入）
 def _load_watch_targets() -> Dict[str, Tuple[str, Optional[str], int]]:
     raw = os.getenv("WATCH_TARGETS", "{}")
@@ -49,6 +50,8 @@ def _load_watch_targets() -> Dict[str, Tuple[str, Optional[str], int]]:
         return out
     except (json.JSONDecodeError, ValueError, TypeError):
         return {}
+
+
 WATCH_TARGETS: Dict[str, Tuple[str, Optional[str], int]] = _load_watch_targets()
 
 
@@ -70,12 +73,16 @@ def check_ups_status() -> Tuple[bool, Optional[str]]:
         )
         if r.returncode != 0:
             return False, None
-        
+
         # 简单解析 ups.status 和 battery.charge
         out = r.stdout
-        status_line = next((line for line in out.splitlines() if line.startswith("ups.status:")), "")
-        charge_line = next((line for line in out.splitlines() if line.startswith("battery.charge:")), "")
-        
+        status_line = next(
+            (line for line in out.splitlines() if line.startswith("ups.status:")), ""
+        )
+        charge_line = next(
+            (line for line in out.splitlines() if line.startswith("battery.charge:")), ""
+        )
+
         # 解析电量，若低于 20% 返回 LOW_BATTERY 触发熔断
         charge = 100
         if charge_line:
@@ -83,14 +90,14 @@ def check_ups_status() -> Tuple[bool, Optional[str]]:
                 charge = int(charge_line.split(":")[1].strip())
             except ValueError:
                 pass
-                
+
         if status_line:
             val = status_line.split(":")[1].strip().upper()
-            if "OB" in val or "LB" in val or charge < 20: 
+            if "OB" in val or "LB" in val or charge < 20:
                 # OB=On Battery, LB=Low Battery
                 return True, "LOW_BATTERY"
             return True, "ONLINE"
-        
+
         return True, "ONLINE"
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return False, None
@@ -100,10 +107,12 @@ def get_redis_client() -> redis.Redis:
     password = os.getenv("REDIS_PASSWORD") or None
     user = os.getenv("REDIS_USER", "default")
     return redis.Redis(
-        host=REDIS_HOST, port=REDIS_PORT, 
-        username=user if password else None, 
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        username=user if password else None,
         password=password,
-        db=0, decode_responses=True
+        db=0,
+        decode_responses=True,
     )
 
 
@@ -188,29 +197,29 @@ def check_hardware_status(
                 f"熔断 [{capability}] 路径丢失 连续{WINDOW_SIZE}次确认 "
                 f"path={path} reason={reason}"
             )
-            
+
     # UPS 动态感知 (Plug & Play)
     ups_capability = "ups"
     state_key = f"zen70:topology:{ups_capability}"
     has_ups, ups_status = check_ups_status()
-    
+
     if ups_capability not in window_cache:
         window_cache[ups_capability] = deque(maxlen=WINDOW_SIZE)
-        
+
     # 如果不存在 UPS（拔除或没有安装），传入 True（代表不触发熔断），让缓存逐渐恢复为 True
     # 如果存在 UPS，且状态为 ONLINE，传入 True
     # 如果存在 UPS，且状态为 LOW_BATTERY，传入 False（触发熔断）
-    is_safe = True 
+    is_safe = True
     if has_ups and ups_status == "LOW_BATTERY":
         is_safe = False
-        
+
     window_cache[ups_capability].append(is_safe)
-    
+
     if len(window_cache[ups_capability]) >= WINDOW_SIZE:
         vals = list(window_cache[ups_capability])
         all_safe = all(vals)
         all_danger = not any(vals)
-        
+
         if all_safe:
             # 安全状态下，如果探测到 UPS，注册为 ONLINE；如果拔除了，完全不写 Redis 锁
             if has_ups:
@@ -224,7 +233,9 @@ def check_hardware_status(
 
 def main() -> None:
     logger.info("ZEN70 拓扑探针启动 (滑动窗口防抖+三重核验)")
-    logger.info("Redis %s:%s 轮询周期 %ss 锁TTL %ss", REDIS_HOST, REDIS_PORT, POLL_INTERVAL, LOCK_TTL)
+    logger.info(
+        "Redis %s:%s 轮询周期 %ss 锁TTL %ss", REDIS_HOST, REDIS_PORT, POLL_INTERVAL, LOCK_TTL
+    )
 
     r = get_redis_client()
     window_cache: Dict[str, Deque[bool]] = {}

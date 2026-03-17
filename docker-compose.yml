@@ -1,5 +1,5 @@
 # ZEN70 容器编排 - 由 scripts/compiler.py 生成
-# 生成时间: 2026-03-17 11:29:32
+# 生成时间: 2026-03-17 16:20:12
 # 法典 1.2：网络平面隔离 frontend_net / backend_net
 
 services:
@@ -108,6 +108,29 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - AI_BACKEND_URL=${AI_BACKEND_URL}
+    depends_on:
+      - redis
+    networks:
+      - backend_net
+    deploy:
+      update_config:
+        order: start-first
+
+  sentinel:
+    image: zen70-gateway:latest
+    container_name: zen70-sentinel
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /dev:/dev:ro
+      - /sys:/sys:ro
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - MOUNT_POINTS=${MOUNT_POINTS}
+      - SWITCH_CONTAINER_MAP=${SWITCH_CONTAINER_MAP_JSON}
+    command: ['python', 'backend/sentinel/topology_sentinel.py']
     depends_on:
       - redis
     networks:

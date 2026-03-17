@@ -5,20 +5,23 @@ ZEN70 系统设置路由 (Settings, Feature Flags, AI Model Config)
 法典 §4.4.1: 基于角色的视图管控
 """
 
-import os
-import platform
 import datetime
 import logging
+import os
+import platform
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update
 
-from backend.api.deps import get_db, get_current_user
+from backend.api.deps import get_current_user, get_db
 from backend.models.feature_flag import (
-    FeatureFlag, SystemConfig,
-    DEFAULT_FLAGS, DEFAULT_CONFIGS, AVAILABLE_MODELS,
+    AVAILABLE_MODELS,
+    DEFAULT_CONFIGS,
+    DEFAULT_FLAGS,
+    FeatureFlag,
+    SystemConfig,
 )
 
 router = APIRouter(prefix="/v1/settings", tags=["settings"])
@@ -30,22 +33,31 @@ async def _ensure_defaults(db: Any) -> None:
     for flag in DEFAULT_FLAGS:
         existing = await db.execute(select(FeatureFlag).where(FeatureFlag.key == flag.key))
         if existing.scalars().first() is None:
-            db.add(FeatureFlag(
-                key=flag.key, enabled=flag.enabled,
-                description=flag.description, category=flag.category,
-            ))
+            db.add(
+                FeatureFlag(
+                    key=flag.key,
+                    enabled=flag.enabled,
+                    description=flag.description,
+                    category=flag.category,
+                )
+            )
     for cfg in DEFAULT_CONFIGS:
         existing = await db.execute(select(SystemConfig).where(SystemConfig.key == cfg.key))
         if existing.scalars().first() is None:
-            db.add(SystemConfig(
-                key=cfg.key, value=cfg.value, description=cfg.description,
-            ))
+            db.add(
+                SystemConfig(
+                    key=cfg.key,
+                    value=cfg.value,
+                    description=cfg.description,
+                )
+            )
     await db.commit()
 
 
 # =========================================================================
 # 功能开关 CRUD
 # =========================================================================
+
 
 @router.get("/flags")
 async def list_flags(
@@ -62,11 +74,15 @@ async def list_flags(
     for f in flags:
         if role != "admin" and not f.enabled:
             continue
-        data.append({
-            "key": f.key, "enabled": f.enabled,
-            "description": f.description, "category": f.category,
-            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
-        })
+        data.append(
+            {
+                "key": f.key,
+                "enabled": f.enabled,
+                "description": f.description,
+                "category": f.category,
+                "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+            }
+        )
     return {"status": "ok", "count": len(data), "data": data}
 
 
@@ -87,14 +103,19 @@ async def toggle_flag(
 
     new_state = not flag.enabled
     await db.execute(
-        update(FeatureFlag).where(FeatureFlag.key == key)
+        update(FeatureFlag)
+        .where(FeatureFlag.key == key)
         .values(enabled=new_state, updated_at=datetime.datetime.utcnow())
     )
     await db.commit()
-    logger.info(f"功能开关 [{key}] 已{'启用' if new_state else '禁用'} by {current_user.get('username', 'unknown')}")
+    logger.info(
+        f"功能开关 [{key}] 已{'启用' if new_state else '禁用'} by {current_user.get('username', 'unknown')}"
+    )
 
     return {
-        "status": "ok", "key": key, "enabled": new_state,
+        "status": "ok",
+        "key": key,
+        "enabled": new_state,
         "message": f"{'✅ 已启用' if new_state else '⛔ 已禁用'}: {flag.description}",
     }
 
@@ -102,6 +123,7 @@ async def toggle_flag(
 # =========================================================================
 # 系统配置 CRUD
 # =========================================================================
+
 
 @router.get("/config")
 async def list_config(
@@ -147,7 +169,8 @@ async def update_config(
         raise HTTPException(status_code=404, detail=f"未知的配置项: {key}")
 
     await db.execute(
-        update(SystemConfig).where(SystemConfig.key == key)
+        update(SystemConfig)
+        .where(SystemConfig.key == key)
         .values(value=str(new_value), updated_at=datetime.datetime.utcnow())
     )
     await db.commit()
@@ -157,10 +180,10 @@ async def update_config(
     return {"status": "ok", "key": key, "value": str(new_value), "message": f"✅ {key} 已更新"}
 
 
-
 # =========================================================================
 # AI 模型管理 — 基于 Provider Registry 抽象层
 # =========================================================================
+
 
 @router.get("/ai-models")
 async def list_available_models(
@@ -175,6 +198,7 @@ async def list_available_models(
         raise HTTPException(status_code=403, detail="仅指挥官可查看模型列表")
 
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
     models = await registry.discover_all_models()
 
@@ -201,6 +225,7 @@ async def scan_models(
         raise HTTPException(status_code=403, detail="仅指挥官可扫描模型")
 
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
     models = await registry.discover_all_models()
     health = await registry.health_all()
@@ -223,6 +248,7 @@ async def provider_health(
         raise HTTPException(status_code=403, detail="仅指挥官可查看 Provider 状态")
 
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
     return {"status": "ok", "providers": await registry.health_all()}
 
@@ -239,6 +265,7 @@ async def list_provider_endpoints(
         raise HTTPException(status_code=403, detail="仅指挥官可查看端点配置")
 
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
     return {"status": "ok", "endpoints": registry.get_all_endpoints()}
 
@@ -267,6 +294,7 @@ async def update_provider_url(
         raise HTTPException(status_code=400, detail="URL 不能为空")
 
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
 
     if not registry.update_url(provider, url):
@@ -282,17 +310,23 @@ async def update_provider_url(
     existing = result.scalars().first()
     if existing:
         await db.execute(
-            update(SystemConfig).where(SystemConfig.key == config_key)
+            update(SystemConfig)
+            .where(SystemConfig.key == config_key)
             .values(value=url, updated_at=datetime.datetime.utcnow())
         )
     else:
-        db.add(SystemConfig(
-            key=config_key, value=url,
-            description=f"Provider [{provider}] 端点地址（指挥官配置）",
-        ))
+        db.add(
+            SystemConfig(
+                key=config_key,
+                value=url,
+                description=f"Provider [{provider}] 端点地址（指挥官配置）",
+            )
+        )
     await db.commit()
 
-    logger.info(f"Provider [{provider}] 端点更新为 [{url}] by {current_user.get('username', 'unknown')}")
+    logger.info(
+        f"Provider [{provider}] 端点更新为 [{url}] by {current_user.get('username', 'unknown')}"
+    )
 
     return {
         "status": "ok",
@@ -327,6 +361,7 @@ async def switch_ai_model(
 
     # 校验 Provider 是否存在
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
     if provider and not registry.get_provider(provider):
         raise HTTPException(
@@ -343,18 +378,23 @@ async def switch_ai_model(
     existing = result.scalars().first()
     if existing:
         await db.execute(
-            update(SystemConfig).where(SystemConfig.key == config_key)
+            update(SystemConfig)
+            .where(SystemConfig.key == config_key)
             .values(value=f"{provider}:{model_id}", updated_at=datetime.datetime.utcnow())
         )
     else:
-        db.add(SystemConfig(
-            key=config_key,
-            value=f"{provider}:{model_id}",
-            description=f"默认 {capability} 模型（指挥官选定）",
-        ))
+        db.add(
+            SystemConfig(
+                key=config_key,
+                value=f"{provider}:{model_id}",
+                description=f"默认 {capability} 模型（指挥官选定）",
+            )
+        )
     await db.commit()
 
-    logger.info(f"AI 模型 [{capability}] 切换为 [{provider}:{model_id}] by {current_user.get('username', 'unknown')}")
+    logger.info(
+        f"AI 模型 [{capability}] 切换为 [{provider}:{model_id}] by {current_user.get('username', 'unknown')}"
+    )
 
     return {
         "status": "ok",
@@ -368,6 +408,7 @@ async def switch_ai_model(
 # =========================================================================
 # 系统信息
 # =========================================================================
+
 
 @router.get("/system")
 async def system_info(
@@ -386,6 +427,7 @@ async def system_info(
 
     # Provider 健康状态
     from backend.core.ai_providers import get_model_registry
+
     registry = get_model_registry()
     provider_health = await registry.health_all()
 
@@ -401,13 +443,16 @@ async def system_info(
 
     # 磁盘用量
     media_path = (os.getenv("MEDIA_PATH") or "").strip()
-    disk_info: dict[str, Any] = {"path": media_path, "status": "not_configured" if not media_path else "unknown"}
+    disk_info: dict[str, Any] = {
+        "path": media_path,
+        "status": "not_configured" if not media_path else "unknown",
+    }
     try:
         if not media_path:
             raise OSError("MEDIA_PATH not set")
         stat = os.statvfs(media_path)  # type: ignore
-        total_gb = (stat.f_blocks * stat.f_frsize) / (1024 ** 3)
-        free_gb = (stat.f_bavail * stat.f_frsize) / (1024 ** 3)
+        total_gb = (stat.f_blocks * stat.f_frsize) / (1024**3)
+        free_gb = (stat.f_bavail * stat.f_frsize) / (1024**3)
         disk_info = {
             "path": media_path,
             "total_gb": round(total_gb, 1),
@@ -429,4 +474,3 @@ async def system_info(
         "ai_models": model_configs,
         "ai_providers": provider_health,
     }
-

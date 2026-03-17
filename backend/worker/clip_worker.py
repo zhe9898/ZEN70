@@ -9,15 +9,16 @@ ZEN70 CLIP AI 语义提取 Worker
 使用方式: python -m backend.worker.clip_worker
 """
 
+import asyncio
+import logging
 import os
+import signal
 import sys
 import time
-import signal
-import logging
-import asyncio
 from typing import Any
 
 from sqlalchemy import select
+
 from backend.db import _async_session_factory
 from backend.models.asset import Asset
 
@@ -29,11 +30,26 @@ INFERENCE_TIMEOUT_SECONDS = int(os.getenv("CLIP_TIMEOUT", "5"))
 
 # 预定义的语义标签候选集 (中英双语)
 CANDIDATE_LABELS = [
-    "人物/portrait", "风景/landscape", "海滩/beach", "城市/city",
-    "美食/food", "宠物/pet", "文档/document", "截图/screenshot",
-    "夜景/night", "花卉/flower", "建筑/architecture", "运动/sports",
-    "婴儿/baby", "自拍/selfie", "日落/sunset", "雪景/snow",
-    "车辆/vehicle", "动物/animal", "室内/indoor", "户外/outdoor",
+    "人物/portrait",
+    "风景/landscape",
+    "海滩/beach",
+    "城市/city",
+    "美食/food",
+    "宠物/pet",
+    "文档/document",
+    "截图/screenshot",
+    "夜景/night",
+    "花卉/flower",
+    "建筑/architecture",
+    "运动/sports",
+    "婴儿/baby",
+    "自拍/selfie",
+    "日落/sunset",
+    "雪景/snow",
+    "车辆/vehicle",
+    "动物/animal",
+    "室内/indoor",
+    "户外/outdoor",
 ]
 
 
@@ -69,7 +85,8 @@ class CLIPInferenceEngine:
             # 延迟导入 — 仅在 Worker 进程中加载重型依赖
             logger.info("📦 正在加载 CLIP 模型... (首次加载可能需要下载)")
             from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer('clip-ViT-B-32', device=self.device)
+
+            self.model = SentenceTransformer("clip-ViT-B-32", device=self.device)
             self._loaded = True
             logger.info(f"✅ CLIP 模型加载完成 (device={self.device})")
         except Exception as e:
@@ -87,42 +104,44 @@ class CLIPInferenceEngine:
             # 模型未加载时返回模拟数据（开发/CI 用）
             logger.warning(f"⚠️ 模型未加载，返回模拟向量: {image_path}")
             import random
+
             return {
                 "embedding": [random.uniform(-1, 1) for _ in range(512)],
                 "tags": ["模拟标签/mock"],
             }
 
-        from PIL import Image
         import torch
+        from PIL import Image
         from sentence_transformers import util
 
         image = Image.open(image_path).convert("RGB")
         # Generate image embedding
         image_embedding = self.model.encode(image, convert_to_tensor=True)
-        
+
         # Generates text embeddings for Zero-shot classification
         text_embeddings = self.model.encode(CANDIDATE_LABELS, convert_to_tensor=True)
-        
+
         # Calculate cosine similarities
         cos_scores = util.cos_sim(image_embedding, text_embeddings)[0]
-        
+
         # Get Top 5 Tags
         top_results = torch.topk(cos_scores, k=min(5, len(CANDIDATE_LABELS)))
         top5_idx = top_results.indices.tolist()
-        
+
         tags = [CANDIDATE_LABELS[i].split("/")[0] for i in top5_idx]
         embedding = image_embedding.cpu().numpy().tolist()
 
         return {"embedding": embedding, "tags": tags}
-        
+
     def embed_text(self, text: str) -> list[float]:
         """
         提取搜索文本的 512 维语义向量 (供 search API 使用)
         """
         if not self._loaded:
             import random
+
             return [random.uniform(-1, 1) for _ in range(512)]
-            
+
         text_embedding = self.model.encode([text], convert_to_tensor=True)[0]
         return text_embedding.cpu().numpy().tolist()
 
@@ -141,7 +160,7 @@ async def process_pending_assets() -> None:
     if _async_session_factory is None:
         logger.error("DB Session Factory 未初始化")
         return
-        
+
     async with _async_session_factory() as db:
         result = await db.execute(
             select(Asset).where(Asset.embedding_status == "pending").limit(10)
@@ -158,22 +177,37 @@ async def process_pending_assets() -> None:
             try:
                 # 提取语义向量与标签
                 result_extr = await asyncio.wait_for(
-                    asyncio.to_thread(engine.extract, asset.file_path), timeout=INFERENCE_TIMEOUT_SECONDS
+                    asyncio.to_thread(engine.extract, asset.file_path),
+                    timeout=INFERENCE_TIMEOUT_SECONDS,
                 )
-                
+
                 # 拦截并判定情感高光时刻 (Family Emotion Vault)
                 # 此处模拟拦截逻辑，未来模型返回纯中文或英文标签
-                emotion_keywords = {"微笑", "奔跑", "聚餐", "婴儿", "smile", "running", "family", "baby", "laughing"}
+                emotion_keywords = {
+                    "微笑",
+                    "奔跑",
+                    "聚餐",
+                    "婴儿",
+                    "smile",
+                    "running",
+                    "family",
+                    "baby",
+                    "laughing",
+                }
                 tags_set = set(result_extr["tags"])
                 is_emotion = bool(tags_set.intersection(emotion_keywords))
-                
+
                 asset.embedding = result_extr["embedding"]
                 asset.ai_tags = result_extr["tags"]
                 asset.is_emotion_highlight = is_emotion
                 asset.embedding_status = "done"
-                logger.info(f"✨ 成功提取资产向量与语义标签: {asset.file_path} -> {result_extr['tags']}")
+                logger.info(
+                    f"✨ 成功提取资产向量与语义标签: {asset.file_path} -> {result_extr['tags']}"
+                )
             except asyncio.TimeoutError:
-                logger.error(f"⏰ 极刑熔断：推理超时 ({INFERENCE_TIMEOUT_SECONDS}s) - {asset.file_path}")
+                logger.error(
+                    f"⏰ 极刑熔断：推理超时 ({INFERENCE_TIMEOUT_SECONDS}s) - {asset.file_path}"
+                )
                 asset.embedding_status = "failed"
             except Exception as e:
                 logger.error(f"💀 推理异常: {e} - {asset.file_path}")
@@ -186,7 +220,9 @@ async def process_pending_assets() -> None:
 async def main_loop() -> None:
     """Worker 主循环：每 10 秒扫描一次待处理资产"""
 
-    logger.info(f"🚀 CLIP Worker 启动 (timeout={INFERENCE_TIMEOUT_SECONDS}s, device={engine.device})")
+    logger.info(
+        f"🚀 CLIP Worker 启动 (timeout={INFERENCE_TIMEOUT_SECONDS}s, device={engine.device})"
+    )
 
     while True:
         try:

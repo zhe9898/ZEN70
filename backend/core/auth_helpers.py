@@ -7,17 +7,15 @@ ZEN70 认证层公共逻辑：依赖校验、挑战消费、请求上下文、�
 from __future__ import annotations
 
 import base64
-import json
 import ipaddress
+import json
 from typing import Any, Optional
 
 from fastapi import HTTPException, Request, status
-
-from backend.core.redis_client import RedisClient
-from backend.core.jwt import create_access_token, get_access_token_expire_seconds
 from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
 
-from backend.core.redis_client import get_logger
+from backend.core.jwt import create_access_token, get_access_token_expire_seconds
+from backend.core.redis_client import RedisClient, get_logger
 
 logger = get_logger("auth")
 
@@ -42,16 +40,26 @@ def require_db_redis(
     if db is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": CODE_DB_UNAVAILABLE, "message": "Database not configured", "details": {}},
+            detail={
+                "code": CODE_DB_UNAVAILABLE,
+                "message": "Database not configured",
+                "details": {},
+            },
         )
     if redis is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": CODE_REDIS_UNAVAILABLE, "message": "Redis not available", "details": {}},
+            detail={
+                "code": CODE_REDIS_UNAVAILABLE,
+                "message": "Redis not available",
+                "details": {},
+            },
         )
 
 
-def zen(code: str, message: str, status_code: int = 400, recovery_hint: str | None = None) -> HTTPException:
+def zen(
+    code: str, message: str, status_code: int = 400, recovery_hint: str | None = None
+) -> HTTPException:
     """统一错误响应（含 recovery_hint，V2.0 契约）。"""
     detail: dict = {"code": code, "message": message, "details": {}}
     if recovery_hint is not None:
@@ -73,12 +81,12 @@ def origin_from_request(req: Request) -> str:
 
 
 def token_response(
-    sub: str, 
-    username: str, 
-    role: str = "user", 
+    sub: str,
+    username: str,
+    role: str = "user",
     tenant_id: str = "default",
     ai_route_preference: str = "auto",
-    **kwargs
+    **kwargs,
 ) -> dict[str, Any]:
     """统一构造 TokenResponse 体。包含 AI 路由偏好和多租户标识法典隔离。"""
     data = {
@@ -86,7 +94,7 @@ def token_response(
         "username": username,
         "role": role,
         "tenant_id": tenant_id,
-        "ai_route_preference": ai_route_preference
+        "ai_route_preference": ai_route_preference,
     }
     # 忽略未知 kwargs，防止调用传错参数导致崩溃
     access_token = create_access_token(data=data)
@@ -174,7 +182,9 @@ async def consume_challenge(
     """
     challenge_b64 = get_challenge_from_credential(credential)
     if not challenge_b64:
-        raise zen(CODE_BAD_REQUEST, "Invalid credential: missing challenge", status.HTTP_400_BAD_REQUEST)
+        raise zen(
+            CODE_BAD_REQUEST, "Invalid credential: missing challenge", status.HTTP_400_BAD_REQUEST
+        )
 
     stored = await redis.get_auth_challenge(challenge_b64)
     if not stored:
@@ -187,7 +197,9 @@ async def consume_challenge(
     try:
         data = json.loads(stored)
     except json.JSONDecodeError:
-        raise zen(CODE_SERVER_ERROR, "Invalid challenge data", status.HTTP_500_INTERNAL_SERVER_ERROR)
+        raise zen(
+            CODE_SERVER_ERROR, "Invalid challenge data", status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     if data.get("flow") != flow:
         raise zen(CODE_BAD_REQUEST, "Invalid challenge flow", status.HTTP_400_BAD_REQUEST)

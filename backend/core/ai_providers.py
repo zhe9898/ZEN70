@@ -11,8 +11,8 @@ vLLM、Jan、GPT4All 以及任何 OpenAI-compatible 后端。
 
 from __future__ import annotations
 
-import os
 import logging
+import os
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -106,11 +106,13 @@ PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
 # 抽象基类
 # =========================================================================
 
+
 class BaseModelProvider(ABC):
     """
     AI 模型提供者抽象基类。
     所有后端必须实现此接口，网关层通过此接口统一调度。
     """
+
     provider_type: str = "unknown"
     base_url: str = ""
 
@@ -119,12 +121,10 @@ class BaseModelProvider(ABC):
         self.base_url = url.rstrip("/")
 
     @abstractmethod
-    async def list_models(self) -> list[dict[str, Any]]:
-        ...
+    async def list_models(self) -> list[dict[str, Any]]: ...
 
     @abstractmethod
-    async def health(self) -> dict[str, Any]:
-        ...
+    async def health(self) -> dict[str, Any]: ...
 
     async def chat(self, model: str, messages: list, **kwargs: Any) -> dict[str, Any]:
         return {"error": f"{self.provider_type} 不支持对话能力", "code": 501}
@@ -137,6 +137,7 @@ class BaseModelProvider(ABC):
 # OpenAI-Compatible Provider (通用基类)
 # LM Studio / LocalAI / text-gen-webui / vLLM / Jan / GPT4All 共用
 # =========================================================================
+
 
 class OpenAICompatibleProvider(BaseModelProvider):
     """
@@ -210,8 +211,10 @@ class OpenAICompatibleProvider(BaseModelProvider):
 # Ollama Provider (专有 API 格式)
 # =========================================================================
 
+
 class OllamaProvider(BaseModelProvider):
     """Ollama — 专有 /api/ 端点 + 自动发现已拉取模型。"""
+
     provider_type = "ollama"
 
     def __init__(self, base_url: str = "") -> None:
@@ -239,18 +242,29 @@ class OllamaProvider(BaseModelProvider):
                         capabilities = ["embed"]
                     if any(k in name_lower for k in ("llava", "bakllava", "moondream", "vision")):
                         capabilities.append("vision")
-                    if any(k in name_lower for k in ("code", "codellama", "deepseek-coder", "starcoder", "qwen2.5-coder")):
+                    if any(
+                        k in name_lower
+                        for k in (
+                            "code",
+                            "codellama",
+                            "deepseek-coder",
+                            "starcoder",
+                            "qwen2.5-coder",
+                        )
+                    ):
                         capabilities.append("code")
 
-                    models.append({
-                        "id": name,
-                        "name": name,
-                        "provider": "ollama",
-                        "size_gb": size_gb,
-                        "capabilities": capabilities,
-                        "auto_discovered": True,
-                        "details": m.get("details", {}),
-                    })
+                    models.append(
+                        {
+                            "id": name,
+                            "name": name,
+                            "provider": "ollama",
+                            "size_gb": size_gb,
+                            "capabilities": capabilities,
+                            "auto_discovered": True,
+                            "details": m.get("details", {}),
+                        }
+                    )
                 return models
         except Exception as e:
             logger.debug(f"Ollama 模型发现失败: {e}")
@@ -264,7 +278,11 @@ class OllamaProvider(BaseModelProvider):
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{self.base_url}/api/version")
                 if resp.status_code == 200:
-                    return {"status": "online", "version": resp.json().get("version", "?"), "url": self.base_url}
+                    return {
+                        "status": "online",
+                        "version": resp.json().get("version", "?"),
+                        "url": self.base_url,
+                    }
         except Exception:
             pass
         return {"status": "offline", "url": self.base_url}
@@ -298,12 +316,22 @@ class OllamaProvider(BaseModelProvider):
 # Local CLIP Provider (内建 Worker)
 # =========================================================================
 
+
 class LocalCLIPProvider(BaseModelProvider):
     """本地 CLIP 视觉模型 Provider（仅 embed 能力）。"""
+
     provider_type = "local_clip"
 
     async def list_models(self) -> list[dict[str, Any]]:
-        return [{"id": "clip-vit-base-patch32", "name": "clip-vit-base-patch32", "provider": "local_clip", "capabilities": ["embed"], "auto_discovered": True}]
+        return [
+            {
+                "id": "clip-vit-base-patch32",
+                "name": "clip-vit-base-patch32",
+                "provider": "local_clip",
+                "capabilities": ["embed"],
+                "auto_discovered": True,
+            }
+        ]
 
     async def health(self) -> dict[str, Any]:
         return {"status": "available", "note": "本地 CLIP Worker 按需启动"}
@@ -312,6 +340,7 @@ class LocalCLIPProvider(BaseModelProvider):
 # =========================================================================
 # Provider 注册表 — 全域单例
 # =========================================================================
+
 
 class ModelProviderRegistry:
     """

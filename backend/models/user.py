@@ -23,14 +23,16 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tenant_id: Mapped[str] = mapped_column(String(64), nullable=False, default="default", index=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="default", index=True
+    )
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     display_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="family")
-    
+
     # AI 算力路由偏好 (法典 9.4: local, cloud, auto)
     ai_route_preference: Mapped[str] = mapped_column(String(16), default="auto", nullable=False)
-    
+
     password_hash: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.utcnow, nullable=False
@@ -42,7 +44,7 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    
+
     push_subscriptions: Mapped[list["PushSubscription"]] = relationship(
         "PushSubscription",
         back_populates="user",

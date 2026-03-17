@@ -15,12 +15,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.deps import get_db, get_redis
 from backend.core.jwt import get_current_user
-from backend.core.redis_client import RedisClient, CHANNEL_BOARD_EVENTS
+from backend.core.redis_client import CHANNEL_BOARD_EVENTS, RedisClient
 from backend.models.board import FamilyMessage
 from backend.models.user import User
 
@@ -55,16 +55,13 @@ class BoardMessageResponse(BaseModel):
 
 # --- Endpoints ---
 
-@router.get(
-    "",
-    response_model=List[BoardMessageResponse],
-    summary="获取当前租户的所有留言记录"
-)
+
+@router.get("", response_model=List[BoardMessageResponse], summary="获取当前租户的所有留言记录")
 async def get_board_messages(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> List[BoardMessageResponse]:
     """
     按时间倒序获取家族信标流。严格遵守 RLS 租户级硬隔离。
@@ -78,23 +75,25 @@ async def get_board_messages(
     )
     result = await db.execute(stmt)
     messages = result.scalars().all()
-    
+
     # 转换为 response (日期强制 isoformat)
     resp = []
     for m in messages:
-        resp.append(BoardMessageResponse(
-            id=m.id,
-            content=m.content,
-            meta_info=m.meta_info,
-            is_pinned=m.is_pinned,
-            created_at=m.created_at.isoformat(),
-            author=AuthorInfo(
-                id=m.author.id,
-                username=m.author.username,
-                display_name=m.author.display_name,
-                role=m.author.role
+        resp.append(
+            BoardMessageResponse(
+                id=m.id,
+                content=m.content,
+                meta_info=m.meta_info,
+                is_pinned=m.is_pinned,
+                created_at=m.created_at.isoformat(),
+                author=AuthorInfo(
+                    id=m.author.id,
+                    username=m.author.username,
+                    display_name=m.author.display_name,
+                    role=m.author.role,
+                ),
             )
-        ))
+        )
     return resp
 
 
@@ -102,14 +101,16 @@ async def get_board_messages(
     "",
     response_model=BoardMessageResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="发布新家族留言"
+    summary="发布新家族留言",
 )
 async def create_board_message(
     payload: BoardMessageCreate,
-    x_idempotency_key: Optional[str] = None,  # TODO: 法典要求的防抖锁可以通过 router dependency 实施，此处简化
+    x_idempotency_key: Optional[
+        str
+    ] = None,  # TODO: 法典要求的防抖锁可以通过 router dependency 实施，此处简化
     db: AsyncSession = Depends(get_db),
     redis: RedisClient | None = Depends(get_redis),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> BoardMessageResponse:
     """
     发布一条新的家族留言。操作成功后，向 Redis CHANNEL_BOARD_EVENTS 广播 SSE 事件。
@@ -119,26 +120,28 @@ async def create_board_message(
         author_id=current_user.id,
         content=payload.content,
         meta_info=payload.meta_info,
-        is_pinned=payload.is_pinned
+        is_pinned=payload.is_pinned,
     )
     db.add(new_msg)
     await db.commit()
     await db.refresh(new_msg)
     # 因为 refresh 并不一定能把 relationship (author) 完美装载（虽然我们在 model 里加了 lazy='joined'，但新建对象时未查询关联），
     # 若直接返回会缺失 author，这里我们强制注入 current_user 的信息给 frontend
-    
+
     # 广播 SSE 事件，驱动极速无感刷新
     if redis:
         try:
-            event_payload = json.dumps({
-                "action": "new_message",
-                "message_id": str(new_msg.id),
-                "author": current_user.display_name or current_user.username
-            })
+            event_payload = json.dumps(
+                {
+                    "action": "new_message",
+                    "message_id": str(new_msg.id),
+                    "author": current_user.display_name or current_user.username,
+                }
+            )
             pubsub = redis.pubsub()
             await redis._client.publish(CHANNEL_BOARD_EVENTS, event_payload)
         except Exception:
-            pass # V2.0: redis 连接抖动时不影响落盘
+            pass  # V2.0: redis 连接抖动时不影响落盘
 
     return BoardMessageResponse(
         id=new_msg.id,
@@ -150,44 +153,39 @@ async def create_board_message(
             id=current_user.id,
             username=current_user.username,
             display_name=current_user.display_name,
-            role=current_user.role
-        )
+            role=current_user.role,
+        ),
     )
 
 
-@router.delete(
-    "/{msg_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="删除家族留言"
-)
+@router.delete("/{msg_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除家族留言")
 async def delete_board_message(
     msg_id: UUID,
     db: AsyncSession = Depends(get_db),
     redis: RedisClient | None = Depends(get_redis),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     删除一条留言（仅本人或 admin 可删）。
     """
-    stmt = select(FamilyMessage).where(FamilyMessage.id == msg_id, FamilyMessage.tenant_id == current_user.tenant_id)
+    stmt = select(FamilyMessage).where(
+        FamilyMessage.id == msg_id, FamilyMessage.tenant_id == current_user.tenant_id
+    )
     result = await db.execute(stmt)
     msg = result.scalar_one_or_none()
-    
+
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
-        
+
     if msg.author_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Permission denied to delete this message")
-        
+
     await db.delete(msg)
     await db.commit()
-    
+
     if redis:
         try:
-            event_payload = json.dumps({
-                "action": "delete_message",
-                "message_id": str(msg_id)
-            })
+            event_payload = json.dumps({"action": "delete_message", "message_id": str(msg_id)})
             pubsub = redis.pubsub()
             await redis._client.publish(CHANNEL_BOARD_EVENTS, event_payload)
         except Exception:

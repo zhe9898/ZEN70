@@ -8,8 +8,9 @@ ZEN70 功能开关 & 系统配置模型
 
 from __future__ import annotations
 
-import os
 import datetime
+import os
+
 from sqlalchemy import Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,6 +22,7 @@ class FeatureFlag(Base):
     功能开关表。
     指挥官可通过后台管理界面切换开关状态。
     """
+
     __tablename__ = "feature_flags"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -29,7 +31,10 @@ class FeatureFlag(Base):
     category: Mapped[str] = mapped_column(String(32), default="general", nullable=False)
 
     updated_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
     )
 
 
@@ -39,6 +44,7 @@ class SystemConfig(Base):
     指挥官可在设置页自行修改 AI 模型、推理超时等参数。
     严禁在代码中硬编码任何模型名称！一切从此表读取。
     """
+
     __tablename__ = "system_config"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -46,25 +52,64 @@ class SystemConfig(Base):
     description: Mapped[str] = mapped_column(Text, nullable=True)
 
     updated_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
     )
 
 
 # 预置开关清单 (系统首次启动时自动写入)
 DEFAULT_FLAGS = [
-    FeatureFlag(key="ai_semantic_search", enabled=False, description="AI 语义搜索：输入自然语言检索照片与安防快照", category="ai"),
-    FeatureFlag(key="ai_auto_tagging", enabled=False, description="AI 智能标签：自动为上传的照片打标签（风景/美食/人物等）", category="ai"),
-    FeatureFlag(key="ai_security_recall", enabled=False, description="AI 安防回溯：在向量空间中融合 Frigate 抓拍帧，支持自然语言搜索监控事件", category="ai"),
-    FeatureFlag(key="jellyfin_streaming", enabled=False, description="Jellyfin 流媒体引擎：启用家庭影院、音乐播放与硬件转码", category="media"),
-    FeatureFlag(key="mqtt_iot_bus", enabled=False, description="MQTT 物联总线：启用智能家居设备联动与安防事件监听", category="iot"),
-    FeatureFlag(key="emotion_capture", enabled=False, description="情感资产沉淀：自动截取微笑、拥抱等温馨瞬间归档（需授权）", category="ai"),
+    FeatureFlag(
+        key="ai_semantic_search",
+        enabled=False,
+        description="AI 语义搜索：输入自然语言检索照片与安防快照",
+        category="ai",
+    ),
+    FeatureFlag(
+        key="ai_auto_tagging",
+        enabled=False,
+        description="AI 智能标签：自动为上传的照片打标签（风景/美食/人物等）",
+        category="ai",
+    ),
+    FeatureFlag(
+        key="ai_security_recall",
+        enabled=False,
+        description="AI 安防回溯：在向量空间中融合 Frigate 抓拍帧，支持自然语言搜索监控事件",
+        category="ai",
+    ),
+    FeatureFlag(
+        key="jellyfin_streaming",
+        enabled=False,
+        description="Jellyfin 流媒体引擎：启用家庭影院、音乐播放与硬件转码",
+        category="media",
+    ),
+    FeatureFlag(
+        key="mqtt_iot_bus",
+        enabled=False,
+        description="MQTT 物联总线：启用智能家居设备联动与安防事件监听",
+        category="iot",
+    ),
+    FeatureFlag(
+        key="emotion_capture",
+        enabled=False,
+        description="情感资产沉淀：自动截取微笑、拥抱等温馨瞬间归档（需授权）",
+        category="ai",
+    ),
 ]
 
 # 预置系统配置 (首次启动写入)
 DEFAULT_CONFIGS = [
     # AI 配置
-    SystemConfig(key="ai_model_id", value="openai/clip-vit-base-patch32", description="当前使用的 AI 视觉模型（可在设置页切换）"),
-    SystemConfig(key="ai_inference_timeout", value="5", description="单次 AI 推理超时秒数（极刑熔断）"),
+    SystemConfig(
+        key="ai_model_id",
+        value="openai/clip-vit-base-patch32",
+        description="当前使用的 AI 视觉模型（可在设置页切换）",
+    ),
+    SystemConfig(
+        key="ai_inference_timeout", value="5", description="单次 AI 推理超时秒数（极刑熔断）"
+    ),
     SystemConfig(key="ai_worker_interval", value="10", description="AI Worker 扫描间隔（秒）"),
     SystemConfig(key="ai_max_batch_size", value="10", description="AI Worker 每轮最大处理资产数"),
     # 网络与端口
@@ -73,12 +118,34 @@ DEFAULT_CONFIGS = [
     SystemConfig(key="caddy_http_port", value="80", description="Caddy 反向代理 HTTP 端口"),
     SystemConfig(key="caddy_https_port", value="443", description="Caddy 反向代理 HTTPS 端口"),
     # 域名配置
-    SystemConfig(key="caddy_domain", value="", description="Caddy 反代挂载域名（如 home.example.com）"),
-    SystemConfig(key="cf_tunnel_domain", value="", description="Cloudflare Tunnel 公网域名（如 zen70.example.com）"),
-    SystemConfig(key="headscale_domain", value="", description="Headscale/WireGuard 内网域名（如 hc.internal）"),
+    SystemConfig(
+        key="caddy_domain", value="", description="Caddy 反代挂载域名（如 home.example.com）"
+    ),
+    SystemConfig(
+        key="cf_tunnel_domain",
+        value="",
+        description="Cloudflare Tunnel 公网域名（如 zen70.example.com）",
+    ),
+    SystemConfig(
+        key="headscale_domain",
+        value="",
+        description="Headscale/WireGuard 内网域名（如 hc.internal）",
+    ),
     # 存储路径
-    SystemConfig(key="media_path", value=os.getenv("MEDIA_PATH", ""), description="媒体文件存储根路径（来自 system.yaml）"),
-    SystemConfig(key="jellyfin_data_path", value=f"{os.getenv('MEDIA_PATH', '').strip()}/jellyfin".strip("/") if os.getenv("MEDIA_PATH", "").strip() else "", description="Jellyfin 媒体库路径"),
+    SystemConfig(
+        key="media_path",
+        value=os.getenv("MEDIA_PATH", ""),
+        description="媒体文件存储根路径（来自 system.yaml）",
+    ),
+    SystemConfig(
+        key="jellyfin_data_path",
+        value=(
+            f"{os.getenv('MEDIA_PATH', '').strip()}/jellyfin".strip("/")
+            if os.getenv("MEDIA_PATH", "").strip()
+            else ""
+        ),
+        description="Jellyfin 媒体库路径",
+    ),
 ]
 
 # =========================================================================
@@ -131,4 +198,3 @@ AVAILABLE_MODELS = [
         "description": "针对中文语义专门优化的 CLIP 模型。中文搜索效果最佳！",
     },
 ]
-
