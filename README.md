@@ -20,6 +20,27 @@ python start_installer.py
 
 ---
 
+## 🛜 常见网络问题：Docker 镜像拉取超时 (仅限中国大陆)
+
+由于网络原因，如果在执行 `docker compose up -d` 时出现类似 `dialing registry-1.docker.io:443 ... A connection attempt failed` 的错误，说明您的 Docker 无法连接到官方镜像库。
+
+**Windows Docker Desktop 解决方案：**
+1. 打开 Docker Desktop，点击右上角齿轮 ⚙️ 进入设置。
+2. 左侧导航至 **Docker Engine**。
+3. 在 JSON 配置中加入以下镜像加速器节点：
+```json
+{
+  "registry-mirrors": [
+    "https://docker.1panel.live",
+    "https://docker.m.daocloud.io",
+    "https://hub.rat.dev"
+  ]
+}
+```
+4. 点击 **Apply & restart**。重启完成后，重新执行一键启动脚本即可。
+
+---
+
 ## 核心架构目标
 
 - **绝对解耦**：软件逻辑与硬件型号彻底切割，硬件仅作为抽象「能力」存在。
