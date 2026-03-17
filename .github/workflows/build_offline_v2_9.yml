@@ -15,32 +15,47 @@ jobs:
   build_offline:
     runs-on: ubuntu-latest
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Pull Required Docker Images
+      - name: Build Local ZEN70-Gateway Image
         run: |
-          docker pull caddy:2-alpine
-          docker pull postgres:15-alpine
-          docker pull edoburu/pgbouncer:1.22.1
-          docker pull redis:7-alpine
-          docker pull cloudflare/cloudflared:latest
-          docker pull victoriametrics/victoria-metrics:latest
-          docker pull grafana/grafana:latest
-          docker pull tecnativa/docker-socket-proxy:latest
-          docker pull flashcatcloud/categraf:latest
-          docker pull grafana/loki:latest
-          docker pull grafana/promtail:latest
-          docker pull prom/alertmanager:latest
-          docker pull victoriametrics/vmalert:latest
-          docker pull eclipse-mosquitto:2
-          docker pull python:3.12-slim
-          docker pull jellyfin/jellyfin:latest
+          docker build -f backend/Dockerfile -t zen70-gateway:latest .
+
+      - name: Pull Required Public Docker Images
+        run: |
+          docker pull caddy:2-alpine || sleep 10 && docker pull caddy:2-alpine
+          docker pull postgres:15-alpine || sleep 10 && docker pull postgres:15-alpine
+          docker pull edoburu/pgbouncer:1.22.1 || sleep 10 && docker pull edoburu/pgbouncer:1.22.1
+          docker pull redis:7-alpine || sleep 10 && docker pull redis:7-alpine
+          docker pull cloudflare/cloudflared:latest || sleep 10 && docker pull cloudflare/cloudflared:latest
+          docker pull victoriametrics/victoria-metrics:latest || sleep 10 && docker pull victoriametrics/victoria-metrics:latest
+          docker pull grafana/grafana:latest || sleep 10 && docker pull grafana/grafana:latest
+          docker pull tecnativa/docker-socket-proxy:latest || sleep 10 && docker pull tecnativa/docker-socket-proxy:latest
+          docker pull flashcatcloud/categraf:latest || sleep 10 && docker pull flashcatcloud/categraf:latest
+          docker pull grafana/loki:latest || sleep 10 && docker pull grafana/loki:latest
+          docker pull grafana/promtail:latest || sleep 10 && docker pull grafana/promtail:latest
+          docker pull prom/alertmanager:latest || sleep 10 && docker pull prom/alertmanager:latest
+          docker pull victoriametrics/vmalert:latest || sleep 10 && docker pull victoriametrics/vmalert:latest
+          docker pull eclipse-mosquitto:2 || sleep 10 && docker pull eclipse-mosquitto:2
+          docker pull python:3.12-slim || sleep 10 && docker pull python:3.12-slim
+          docker pull jellyfin/jellyfin:latest || sleep 10 && docker pull jellyfin/jellyfin:latest
           
       - name: Save images to tar archive
         run: |
           mkdir -p offline_bundle/ZEN70_V2.9
           docker save -o offline_bundle/ZEN70_V2.9/zen70_offline_images_v2.9.tar \
+            zen70-gateway:latest \
             caddy:2-alpine postgres:15-alpine edoburu/pgbouncer:1.22.1 redis:7-alpine \
             cloudflare/cloudflared:latest victoriametrics/victoria-metrics:latest \
             grafana/grafana:latest tecnativa/docker-socket-proxy:latest flashcatcloud/categraf:latest \
