@@ -1,0 +1,65 @@
+name: Build V2.9 Offline Bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build_offline_v2_9.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_offline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Pull Required Docker Images
+        run: |
+          docker pull caddy:2-alpine
+          docker pull postgres:15-alpine
+          docker pull edoburu/pgbouncer:1.22.1
+          docker pull redis:7-alpine
+          docker pull cloudflare/cloudflared:latest
+          docker pull victoriametrics/victoria-metrics:latest
+          docker pull grafana/grafana:latest
+          docker pull tecnativa/docker-socket-proxy:latest
+          docker pull flashcatcloud/categraf:latest
+          docker pull grafana/loki:latest
+          docker pull grafana/promtail:latest
+          docker pull prom/alertmanager:latest
+          docker pull victoriametrics/vmalert:latest
+          docker pull eclipse-mosquitto:2
+          docker pull python:3.12-slim
+          docker pull jellyfin/jellyfin:latest
+          
+      - name: Save images to tar archive
+        run: |
+          mkdir -p offline_bundle/ZEN70_V2.9
+          docker save -o offline_bundle/ZEN70_V2.9/zen70_offline_images_v2.9.tar \
+            caddy:2-alpine postgres:15-alpine edoburu/pgbouncer:1.22.1 redis:7-alpine \
+            cloudflare/cloudflared:latest victoriametrics/victoria-metrics:latest \
+            grafana/grafana:latest tecnativa/docker-socket-proxy:latest flashcatcloud/categraf:latest \
+            grafana/loki:latest grafana/promtail:latest prom/alertmanager:latest \
+            victoriametrics/vmalert:latest eclipse-mosquitto:2 python:3.12-slim jellyfin/jellyfin:latest
+
+      - name: Package Repository
+        run: |
+          rsync -a --exclude='.git/' --exclude='offline_bundle/' ./ offline_bundle/ZEN70_V2.9/
+          cd offline_bundle
+          zip -r zen70_v2.9_offline_bundle.zip ZEN70_V2.9/
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v2.9"
+          name: "ZEN70 V2.9 (Offline Docker Bundle)"
+          files: offline_bundle/zen70_v2.9_offline_bundle.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
