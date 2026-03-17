@@ -164,6 +164,29 @@ services:
     depends_on:
     - redis
 
+  # 物理机守望者 (Sentinel)：必须被容器化！严禁在宿主机裸奔
+  sentinel:
+    enabled: true
+    image: zen70-gateway:latest
+    container_name: zen70-sentinel
+    networks:
+    - backend_net
+    pid: host
+    privileged: true
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      MOUNT_POINTS: "${MOUNT_POINTS}"
+      SWITCH_CONTAINER_MAP: "${SWITCH_CONTAINER_MAP_JSON}"
+    command: ["python", "backend/sentinel/topology_sentinel.py"]
+    depends_on:
+    - redis
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /dev:/dev:ro
+    - /sys:/sys:ro
+
   # 公网访问隧道：必须配置 TUNNEL_TOKEN，严禁在 YAML 中硬编码（法典 8.1.2）
   cloudflared:
     enabled: true

@@ -14,8 +14,8 @@ set PYTHONPATH=.
 set REDIS_HOST=127.0.0.1
 
 echo.
-echo [3/4] 正在拉起物理极刑安全探针(Sentinel)至后台静默运行...
-start "ZEN70_Sentinel" /MIN python backend/sentinel/top_sentinel.py
+echo [3/4] 安全探针与守望者监控网略已由容器集群接管运行...
+REM (法典 1.1：一切皆容器) 物理探针已被迁移至 system.yaml 中的 sentinel 容器，禁止在此裸跑 Python
 
 echo.
 echo [4/4] 正在呼出主控台浏览器窗口...

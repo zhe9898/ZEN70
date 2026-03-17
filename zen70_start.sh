@@ -11,10 +11,8 @@ echo -e "\n[2/4] 环境预检与探测..."
 export PYTHONPATH="."
 export REDIS_HOST="127.0.0.1"
 
-echo -e "\n[3/4] 正在拉起物理极刑安全探针(Sentinel)至后台静默运行..."
-# 检查是否已有探针运行以防多开
-pkill -f "python backend/sentinel/top_sentinel.py" 2>/dev/null
-nohup python backend/sentinel/top_sentinel.py > /dev/null 2>&1 &
+echo -e "\n[3/4] 安全探针与守望者监控网略已由容器集群接管运行..."
+# (法典 1.1：一切皆容器) 物理探针已被迁移至 system.yaml 中的 sentinel 容器，禁止在此宿主机裸跑 Python
 
 echo -e "\n[4/4] 守护进程已就位。请访问:"
 echo "主控台: http://localhost/"
