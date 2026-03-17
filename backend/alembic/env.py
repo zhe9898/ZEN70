@@ -27,7 +27,7 @@ root_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(root_dir))
 
 # 尝试加载当前目录上一级的下一级（即项目根目录）的 .env
-load_dotenv(root_dir / '.env')
+load_dotenv(root_dir / ".env")
 
 # Set config sqlalchemy.url dynamically
 POSTGRES_DSN = os.getenv("POSTGRES_DSN")
@@ -36,7 +36,9 @@ if POSTGRES_DSN:
         POSTGRES_DSN = POSTGRES_DSN.replace("postgresql://", "postgresql+asyncpg://", 1)
     if os.getenv("DB_OFFLINE_LOCAL") == "1":
         # Force rewrite for Windows port-forwarded offline tasks
-        POSTGRES_DSN = POSTGRES_DSN.replace("@pgbouncer:5432/", "@localhost:5432/").replace("@postgres:5432/", "@localhost:5432/")
+        POSTGRES_DSN = POSTGRES_DSN.replace(
+            "@pgbouncer:5432/", "@localhost:5432/"
+        ).replace("@postgres:5432/", "@localhost:5432/")
     config.set_main_option("sqlalchemy.url", POSTGRES_DSN)
 
 # Import all models to ensure they are registered with Base.metadata
@@ -103,12 +105,30 @@ async def run_async_migrations() -> None:
     await connectable.dispose()
 
 
+import threading
+import time
+
 # 法典 3.5：upgrade head 前必须向 Redis 申请全局互斥锁 DB_MIGRATION_LOCK，防并发 DDL 脑裂
 DB_MIGRATION_LOCK_KEY = "zen70:DB_MIGRATION_LOCK"
-DB_MIGRATION_LOCK_TIMEOUT = 3600  # 锁持有最长时间（秒）
+DB_MIGRATION_LOCK_TIMEOUT = 120  # 初始锁持有时间（秒）
 
 
-def _acquire_migration_lock() -> "tuple[object, object] | None":
+def _watchdog_thread(redis_client, lock, stop_event):
+    """守护线程：每 10 秒为迁移锁自动续期，防长耗时 DDL 超时脑裂"""
+    while not stop_event.is_set():
+        try:
+            # PEXPIRE 续期 120 秒
+            redis_client.pexpire(lock.name, DB_MIGRATION_LOCK_TIMEOUT * 1000)
+        except Exception as e:
+            # 仅记录或静默，若 Redis 崩溃，锁终将自然释放
+            pass
+        # 每隔 10 秒心跳一次
+        stop_event.wait(10)
+
+
+def _acquire_migration_lock() -> (
+    "tuple[object, object, threading.Event, threading.Thread] | None"
+):
     """尝试连接 Redis 并获取迁移锁；不可用时返回 None（离线模式可跳过）。"""
     try:
         import redis
@@ -120,15 +140,26 @@ def _acquire_migration_lock() -> "tuple[object, object] | None":
         password = os.environ.get("REDIS_PASSWORD") or None
         user = os.environ.get("REDIS_USER", "default")
         r = redis.Redis(
-            host=host, port=port, password=password,
+            host=host,
+            port=port,
+            password=password,
             username=user if password else None,
-            socket_connect_timeout=5, decode_responses=True
+            socket_connect_timeout=5,
+            decode_responses=True,
         )
         r.ping()
         lock = r.lock(DB_MIGRATION_LOCK_KEY, timeout=DB_MIGRATION_LOCK_TIMEOUT)
-        if lock.acquire(blocking=True, blocking_timeout=120):
-            return (r, lock)
-        raise RuntimeError("无法在 120s 内获取 DB_MIGRATION_LOCK，可能有其他节点正在执行迁移")
+        if lock.acquire(blocking=True, blocking_timeout=60):
+            # 成功获取后，拉起看门狗
+            stop_event = threading.Event()
+            watchdog = threading.Thread(
+                target=_watchdog_thread, args=(r, lock, stop_event), daemon=True
+            )
+            watchdog.start()
+            return (r, lock, stop_event, watchdog)
+        raise RuntimeError(
+            "无法在 60s 内获取 DB_MIGRATION_LOCK，可能有其他节点正在执行迁移"
+        )
     except Exception:
         if os.getenv("SKIP_DB_MIGRATION_LOCK"):
             return None
@@ -136,14 +167,16 @@ def _acquire_migration_lock() -> "tuple[object, object] | None":
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode. 法典 3.5：先获取 Redis 迁移锁再执行。"""
-    lock_holder = _acquire_migration_lock()
+    """Run migrations in 'online' mode. 法典 3.5：先获取 Redis 迁移锁及看门狗再执行。"""
+    lock_bundle = _acquire_migration_lock()
     try:
         asyncio.run(run_async_migrations())
     finally:
-        if lock_holder is not None:
-            _r, lock = lock_holder
+        if lock_bundle is not None:
+            _r, lock, stop_event, watchdog = lock_bundle
             try:
+                stop_event.set()  # 通知看门狗停转
+                watchdog.join(timeout=2.0)
                 lock.release()  # type: ignore
             except Exception:
                 pass
