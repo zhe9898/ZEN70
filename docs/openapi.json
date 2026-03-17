@@ -1,0 +1,683 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ZEN70 API Gateway",
+    "version": "1.58.0"
+  },
+  "paths": {
+    "/api/v1/ai/{path}": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Universal Ai Proxy",
+        "description": "通用代理所有发往 /api/v1/ai/xxx 的请求。\n完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。",
+        "operationId": "universal_ai_proxy_api_v1_ai__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "防并发脑裂幂等性UUID (仅对重型推送有效)",
+              "title": "X-Idempotency-Key"
+            },
+            "description": "防并发脑裂幂等性UUID (仅对重型推送有效)"
+          },
+          {
+            "name": "X-Capability-Target",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+              "title": "X-Capability-Target"
+            },
+            "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Universal Ai Proxy",
+        "description": "通用代理所有发往 /api/v1/ai/xxx 的请求。\n完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。",
+        "operationId": "universal_ai_proxy_api_v1_ai__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "防并发脑裂幂等性UUID (仅对重型推送有效)",
+              "title": "X-Idempotency-Key"
+            },
+            "description": "防并发脑裂幂等性UUID (仅对重型推送有效)"
+          },
+          {
+            "name": "X-Capability-Target",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+              "title": "X-Capability-Target"
+            },
+            "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Universal Ai Proxy",
+        "description": "通用代理所有发往 /api/v1/ai/xxx 的请求。\n完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。",
+        "operationId": "universal_ai_proxy_api_v1_ai__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "防并发脑裂幂等性UUID (仅对重型推送有效)",
+              "title": "X-Idempotency-Key"
+            },
+            "description": "防并发脑裂幂等性UUID (仅对重型推送有效)"
+          },
+          {
+            "name": "X-Capability-Target",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+              "title": "X-Capability-Target"
+            },
+            "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Universal Ai Proxy",
+        "description": "通用代理所有发往 /api/v1/ai/xxx 的请求。\n完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。",
+        "operationId": "universal_ai_proxy_api_v1_ai__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "防并发脑裂幂等性UUID (仅对重型推送有效)",
+              "title": "X-Idempotency-Key"
+            },
+            "description": "防并发脑裂幂等性UUID (仅对重型推送有效)"
+          },
+          {
+            "name": "X-Capability-Target",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+              "title": "X-Capability-Target"
+            },
+            "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Universal Ai Proxy",
+        "description": "通用代理所有发往 /api/v1/ai/xxx 的请求。\n完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。",
+        "operationId": "universal_ai_proxy_api_v1_ai__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "防并发脑裂幂等性UUID (仅对重型推送有效)",
+              "title": "X-Idempotency-Key"
+            },
+            "description": "防并发脑裂幂等性UUID (仅对重型推送有效)"
+          },
+          {
+            "name": "X-Capability-Target",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+              "title": "X-Capability-Target"
+            },
+            "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Universal Ai Proxy",
+        "description": "通用代理所有发往 /api/v1/ai/xxx 的请求。\n完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。",
+        "operationId": "universal_ai_proxy_api_v1_ai__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "防并发脑裂幂等性UUID (仅对重型推送有效)",
+              "title": "X-Idempotency-Key"
+            },
+            "description": "防并发脑裂幂等性UUID (仅对重型推送有效)"
+          },
+          {
+            "name": "X-Capability-Target",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+              "title": "X-Capability-Target"
+            },
+            "description": "目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "summary": "Capabilities",
+        "description": "法典 2.3.1：返回能力矩阵，供前端 v-for 动态渲染。\n基于 BFF 定义：根据登录者 role 决定下发的 JSON 视图积木。",
+        "operationId": "capabilities_api_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/CapabilityItem"
+                  },
+                  "type": "object",
+                  "title": "Response Capabilities Api V1 Capabilities Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/stream/ping": {
+      "post": {
+        "summary": "Stream Ping",
+        "description": "法典 2.1.1：前端每 30s 调此接口续期，否则 45s 后服务端 cancel SSE。",
+        "operationId": "stream_ping_api_v1_stream_ping_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stream": {
+      "get": {
+        "summary": "Stream",
+        "description": "法典 2.1.1：SSE 单向推送。前端每 30s 调 POST /api/v1/stream/ping 续期，\n后端 45s 未收到必须 cancel() 释放 FD，杜绝半开连接耗尽资源。",
+        "operationId": "stream_api_v1_stream_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "description": "健康检查。",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/status": {
+      "get": {
+        "summary": "Media Status",
+        "description": "示例路由：依赖 media_engine，PENDING 时 503。",
+        "operationId": "media_status_api_v1_media_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/storage/shred": {
+      "delete": {
+        "summary": "Secure Shredding",
+        "description": "法典 3.3.2: 安全覆写销毁 (Secure Shredding)。\n严禁使用 os.remove()。必须调用 Linux shred 指令\n执行 3 次随机覆写并以零结尾，确保数据不可物理恢复。",
+        "operationId": "secure_shredding_api_v1_storage_shred_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShredRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CapabilityItem": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "online | pending_maintenance | unknown"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "是否可交互"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint",
+            "description": "绑定的内网或外网端点"
+          },
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models",
+            "description": "携带的具体模型数组"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "状态或异常附加说明"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "enabled"
+        ],
+        "title": "CapabilityItem",
+        "description": "单个能力：status=online 则 enabled，PENDING_MAINTENANCE 则 disabled。"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PingRequest": {
+        "properties": {
+          "connection_id": {
+            "type": "string",
+            "title": "Connection Id",
+            "description": "SSE 连接建立时下发的 ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "connection_id"
+        ],
+        "title": "PingRequest",
+        "description": "Ping 请求体：前端每 30s 调用，防 45s 超时 cancel。"
+      },
+      "ShredRequest": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "宿主机或容器内待物理粉碎的绝对路径"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_path"
+        ],
+        "title": "ShredRequest",
+        "description": "法典 3.3.2 - 数据可携带权与安全剿灭"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

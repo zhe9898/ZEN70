@@ -1,0 +1,276 @@
+# ZEN70 容器编排 - 由 scripts/compiler.py 生成
+# 生成时间: 2026-03-17 11:29:32
+# 法典 1.2：网络平面隔离 frontend_net / backend_net
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: zen70-caddy
+    restart: unless-stopped
+    volumes:
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/var/www/html:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - frontend_net
+      - backend_net
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: zen70-postgres
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - backend_net
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1
+    container_name: zen70-pgbouncer
+    restart: unless-stopped
+    environment:
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=postgres
+      - DB_NAME=${POSTGRES_DB}
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=100
+      - DEFAULT_POOL_SIZE=20
+      - LISTEN_PORT=5432
+    depends_on:
+      - postgres
+    networks:
+      - backend_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: zen70-redis
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    oom_score_adj: -999
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - redis_data:/data
+      - ./config/users.acl:/data/users.acl:ro
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory', '800mb', '--maxmemory-policy', 'allkeys-lru', '--aclfile', '/data/users.acl']
+    networks:
+      - backend_net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  gateway:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: zen70-gateway:latest
+    container_name: zen70-gateway
+    restart: unless-stopped
+    user: '${PUID:-1000}:${PGID:-1000}'
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    oom_score_adj: -999
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - AI_BACKEND_URL=${AI_BACKEND_URL}
+    depends_on:
+      - redis
+    networks:
+      - backend_net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: zen70-cloudflared
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    command: "tunnel --no-autoupdate run"
+    networks:
+      - frontend_net
+      - backend_net
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: zen70-victoriametrics
+    restart: unless-stopped
+    volumes:
+      - victoriametrics_data:/vmetrics
+    command: ['-storageDataPath=/vmetrics', '-retentionPeriod=1y']
+    networks:
+      - backend_net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zen70-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - backend_net
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: zen70-docker-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - SERVICES=1
+      - TASKS=1
+      - NETWORKS=1
+      - NODES=1
+    networks:
+      - backend_net
+
+  categraf:
+    image: flashcatcloud/categraf:latest
+    container_name: zen70-categraf
+    restart: unless-stopped
+    volumes:
+      - ./config/categraf:/etc/categraf/conf
+      - /:/hostfs:ro
+      - /proc:/host_proc:ro
+      - /sys:/host_sys:ro
+    environment:
+      - HOST_PROC=/host_proc
+      - HOST_SYS=/host_sys
+      - DOCKER_HOST=tcp://docker-proxy:2375
+    depends_on:
+      - docker-proxy
+    networks:
+      - backend_net
+
+  loki:
+    image: grafana/loki:latest
+    container_name: zen70-loki
+    restart: unless-stopped
+    volumes:
+      - ./config/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: ['-config.file=/etc/loki/local-config.yaml']
+    ports:
+      - 3100:3100
+    networks:
+      - backend_net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: zen70-promtail
+    restart: unless-stopped
+    volumes:
+      - ./config/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ['-config.file=/etc/promtail/promtail-config.yaml']
+    networks:
+      - backend_net
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: zen70-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml']
+    ports:
+      - 9093:9093
+    networks:
+      - backend_net
+
+  vmalert:
+    image: victoriametrics/vmalert:latest
+    container_name: zen70-vmalert
+    restart: unless-stopped
+    volumes:
+      - ./config/vmalert/alerts.yml:/etc/vmalert/alerts.yml:ro
+    command: ['-rule=/etc/vmalert/alerts.yml', '-datasource.url=http://victoriametrics:8428', '-notifier.url=http://alertmanager:9093', '-remoteWrite.url=http://victoriametrics:8428', '-remoteRead.url=http://victoriametrics:8428']
+    depends_on:
+      - victoriametrics
+      - alertmanager
+    networks:
+      - backend_net
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: zen70-mosquitto
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    ports:
+      - 1883:1883
+      - 8883:8883
+    networks:
+      - backend_net
+
+
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy_config: {}
+  caddy_data: {}
+  grafana_data: {}
+  jellyfin_cache: {}
+  jellyfin_config: {}
+  loki_data: {}
+  mosquitto_data: {}
+  mosquitto_log: {}
+  postgres_data: {}
+  redis_data: {}
+  victoriametrics_data: {}

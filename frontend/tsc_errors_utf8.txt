@@ -1,0 +1,81 @@
+﻿src/views/SystemSettings.vue(25,16): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ ai: string; media: string; iot: string; general: string; }'.
+src/views/SystemSettings.vue(28,71): error TS2339: Property 'key' does not exist on type 'never'.
+src/views/SystemSettings.vue(32,59): error TS2339: Property 'key' does not exist on type 'never'.
+src/views/SystemSettings.vue(33,72): error TS2339: Property 'description' does not exist on type 'never'.
+src/views/SystemSettings.vue(35,85): error TS2339: Property 'enabled' does not exist on type 'never'.
+src/views/SystemSettings.vue(36,44): error TS2339: Property 'key' does not exist on type 'never'.
+src/views/SystemSettings.vue(36,79): error TS2339: Property 'key' does not exist on type 'never'.
+src/views/SystemSettings.vue(57,100): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/views/SystemSettings.vue(74,100): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/views/SystemSettings.vue(90,100): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/views/SystemSettings.vue(118,51): error TS2339: Property 'label' does not exist on type 'never'.
+src/views/SystemSettings.vue(119,68): error TS2339: Property 'description' does not exist on type 'never'.
+src/views/SystemSettings.vue(124,36): error TS2339: Property 'default_url' does not exist on type 'never'.
+src/views/SystemSettings.vue(124,88): error TS2339: Property 'default_port' does not exist on type 'never'.
+src/views/SystemSettings.vue(135,32): error TS2339: Property 'default_port' does not exist on type 'never'.
+src/views/SystemSettings.vue(135,87): error TS2339: Property 'default_port' does not exist on type 'never'.
+src/views/SystemSettings.vue(165,64): error TS2339: Property 'length' does not exist on type 'never'.
+src/views/SystemSettings.vue(168,54): error TS2339: Property 'id' does not exist on type 'number'.
+src/views/SystemSettings.vue(174,28): error TS2339: Property 'name' does not exist on type 'number'.
+src/views/SystemSettings.vue(174,42): error TS2339: Property 'id' does not exist on type 'number'.
+src/views/SystemSettings.vue(175,37): error TS2339: Property 'auto_discovered' does not exist on type 'number'.
+src/views/SystemSettings.vue(178,32): error TS2339: Property 'description' does not exist on type 'number'.
+src/views/SystemSettings.vue(178,96): error TS2339: Property 'description' does not exist on type 'number'.
+src/views/SystemSettings.vue(180,45): error TS2339: Property 'capabilities' does not exist on type 'number'.
+src/views/SystemSettings.vue(182,37): error TS2339: Property 'size_gb' does not exist on type 'number'.
+src/views/SystemSettings.vue(182,90): error TS2339: Property 'size_gb' does not exist on type 'number'.
+src/views/SystemSettings.vue(183,37): error TS2339: Property 'size' does not exist on type 'number'.
+src/views/SystemSettings.vue(183,87): error TS2339: Property 'size' does not exist on type 'number'.
+src/views/SystemSettings.vue(184,37): error TS2339: Property 'dim' does not exist on type 'number'.
+src/views/SystemSettings.vue(184,86): error TS2339: Property 'dim' does not exist on type 'number'.
+src/views/SystemSettings.vue(208,55): error TS2339: Property 'version' does not exist on type 'never'.
+src/views/SystemSettings.vue(209,52): error TS2339: Property 'python' does not exist on type 'never'.
+src/views/SystemSettings.vue(213,54): error TS2339: Property 'os' does not exist on type 'never'.
+src/views/SystemSettings.vue(214,45): error TS2339: Property 'architecture' does not exist on type 'never'.
+src/views/SystemSettings.vue(218,59): error TS2339: Property 'gpu' does not exist on type 'never'.
+src/views/SystemSettings.vue(219,24): error TS2339: Property 'gpu' does not exist on type 'never'.
+src/views/SystemSettings.vue(222,94): error TS2339: Property 'disk' does not exist on type 'never'.
+src/views/SystemSettings.vue(225,24): error TS2339: Property 'disk' does not exist on type 'never'.
+src/views/SystemSettings.vue(225,47): error TS2339: Property 'disk' does not exist on type 'never'.
+src/views/SystemSettings.vue(225,78): error TS2339: Property 'disk' does not exist on type 'never'.
+src/views/SystemSettings.vue(227,48): error TS2339: Property 'disk' does not exist on type 'never'.
+src/views/SystemSettings.vue(227,78): error TS2339: Property 'disk' does not exist on type 'never'.
+src/views/SystemSettings.vue(229,108): error TS2339: Property 'ai_providers' does not exist on type 'never'.
+src/views/SystemSettings.vue(232,43): error TS2339: Property 'ai_providers' does not exist on type 'never'.
+src/views/SystemSettings.vue(318,83): error TS2339: Property 'category' does not exist on type 'never'.
+src/views/SystemSettings.vue(319,26): error TS7006: Parameter 'cat' implicitly has an 'any' type.
+src/views/SystemSettings.vue(319,68): error TS2339: Property 'category' does not exist on type 'never'.
+src/views/SystemSettings.vue(321,19): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/views/SystemSettings.vue(322,10): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ chat: string; embed: string; vision: string; audio: string; code: string; }'.
+src/views/SystemSettings.vue(324,19): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/views/SystemSettings.vue(325,10): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ chat: string; embed: string; vision: string; code: string; }'.
+src/views/SystemSettings.vue(327,26): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/views/SystemSettings.vue(330,24): error TS7006: Parameter 'key' implicitly has an 'any' type.
+src/views/SystemSettings.vue(331,13): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(334,24): error TS7006: Parameter 'key' implicitly has an 'any' type.
+src/views/SystemSettings.vue(335,13): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(339,26): error TS7006: Parameter 'url' implicitly has an 'any' type.
+src/views/SystemSettings.vue(342,62): error TS2339: Property 'headers' does not exist on type '{}'.
+src/views/SystemSettings.vue(350,27): error TS7006: Parameter 'key' implicitly has an 'any' type.
+src/views/SystemSettings.vue(364,9): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/views/SystemSettings.vue(364,27): error TS18046: 'v' is of type 'unknown'.
+src/views/SystemSettings.vue(373,29): error TS7006: Parameter 'key' implicitly has an 'any' type.
+src/views/SystemSettings.vue(378,50): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(389,78): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(389,84): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(389,95): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(423,75): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(423,81): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(423,92): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/views/SystemSettings.vue(430,28): error TS7006: Parameter 'model' implicitly has an 'any' type.
+src/views/SystemSettings.vue(439,69): error TS7053: Element implicitly has an 'any' type because expression of type '"ai_model_chat" | "ai_model_embed" | "ai_model_vision"' can't be used to index type '{}'.
+  Property 'ai_model_chat' does not exist on type '{}'.
+src/views/SystemSettings.vue(452,9): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/views/SystemSettings.vue(460,3): error TS2322: Type 'string' is not assignable to type 'null'.
+src/views/SystemSettings.vue(463,52): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.

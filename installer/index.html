@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZEN70 开源部署向导</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        body { 
+            background-color: #f8fafc; 
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, Arial, sans-serif; 
+            -webkit-font-smoothing: antialiased;
+        }
+        .header-bg {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .glass-card { 
+            background: #ffffff; 
+            border: 1px solid #e2e8f0; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
+            border-radius: 12px;
+        }
+        .terminal { 
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace; 
+            font-size: 0.85rem; 
+            line-height: 1.5;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        .step-active { color: #2563eb !important; font-weight: 600; }
+        .btn-modern {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            transition: background-color 0.2s;
+        }
+        .btn-modern:hover { background-color: #1d4ed8; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center">
+    
+    <!-- 顶栏 -->
+    <header class="header-bg w-full py-4 px-8 flex justify-between items-center z-10">
+        <div class="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM11 19.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.22.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
+            <span class="text-xl font-semibold text-slate-800 tracking-tight">ZEN70 <span class="text-slate-500 font-normal">开源智能家居部署</span></span>
+        </div>
+        <div class="text-sm text-slate-500 font-medium">100% 开源免费</div>
+    </header>
+
+    <div id="app" class="max-w-4xl w-full flex-1 flex flex-col py-10 px-4 mt-6">
+        
+        <!-- 步骤条组件 -->
+        <ul class="steps steps-horizontal w-full mb-10 text-sm font-medium text-slate-400">
+            <li class="step step-primary step-active">1. 基础配置</li>
+            <li class="step" :class="{'step-primary step-active': isDeploying || isFinished }">2. 自动化架构部署</li>
+            <li class="step" :class="{'step-primary step-active': isFinished }">3. 服务就绪</li>
+        </ul>
+
+        <div class="glass-card flex-1 p-8 md:p-12 relative overflow-hidden">
+            <!-- 背景点缀 -->
+            <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-50 rounded-full opacity-50 blur-3xl pointer-events-none"></div>
+
+            <div v-show="!isDeploying && !isFinished" class="space-y-8 relative z-10 transition-opacity">
+                <div>
+                    <h2 class="text-2xl font-semibold text-slate-800 mb-2">配置网络平面属性</h2>
+                    <p class="text-slate-500 text-sm">请在此处声明基础服务域标识。底层编排引擎将据此调度网关及证书挂载点。</p>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="form-control">
+                        <label class="label mb-1 p-0 block">
+                            <span class="text-sm font-semibold text-slate-700">专属访问域名 (如有)</span>
+                        </label>
+                        <input v-model="form.domain" type="text" class="input input-bordered w-full bg-slate-50/50 focus:bg-white transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="例如: nas.yoursite.com 或 home.zen70.local">
+                        <span class="text-xs text-slate-500 mt-2 block"><b>如果你自己购买过域名：</b>直接填在这里（如 <code>nas.xxx.com</code>），系统会自动用它配置网关。<br><b>如果你没有：</b>千万别改它，直接保持系统默认的 <code>home.zen70.local</code> 即可完美在内网运行。</span>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label mb-1 p-0 block flex justify-between items-center">
+                            <div>
+                                <span class="text-sm font-semibold text-slate-700">外网穿透令牌 (Cloudflare Tunnel Token)</span>
+                                <span class="text-xs text-slate-400 font-normal ml-2">选填</span>
+                            </div>
+                            <button onclick="cf_modal.showModal()" class="text-xs text-blue-600 hover:text-blue-800 underline bg-blue-50 px-2 py-0.5 rounded flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                不会填？看图文教程
+                            </button>
+                        </label>
+                        <input v-model="form.tunnel_token" type="password" class="input input-bordered w-full bg-slate-50/50 focus:bg-white transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="复制这段：eyJh... (超长乱码)">
+                        <span class="text-xs text-slate-500 mt-2 block">填入此项后，哪怕在公司或户外用手机 5G 也能安全访问家里系统。（如果部署后访问报错 1033，请务必「点开教程」查看最后一步哦）</span>
+                    </div>
+
+                    <div class="divider before:bg-slate-100 after:bg-slate-100 my-6"></div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-800 mb-1">存储文件夹设置</h3>
+                        <p class="text-slate-500 text-sm">请设置您的电影、照片和 AI 模型要存在电脑的哪个盘里。支持所有系统。</p>
+                    </div>
+                    <div class="form-control">
+                        <label class="label mb-1 p-0 block">
+                            <span class="text-sm font-semibold text-slate-700">影音存储路径 (MEDIA_PATH)</span>
+                        </label>
+                        <input v-model="form.media_path" type="text" class="input input-bordered w-full bg-slate-50/50 focus:bg-white transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Windows 例如 D:\Movies，Linux 例如 /mnt/media">
+                        <span class="text-xs text-slate-500 mt-2 block">您的电影、照片会保存在这里。Windows 用户强烈建议放到 D 盘或 E 盘（如 <code>D:\ZEN70_Media</code>），避免塞满 C 盘导致系统变卡！</span>
+                    </div>
+                    <div class="form-control">
+                        <label class="label mb-1 p-0 block flex justify-between">
+                            <span class="text-sm font-semibold text-slate-700">AI 模型数据存放处 (可选)</span>
+                            <span class="text-xs text-slate-400 font-normal">选填</span>
+                        </label>
+                        <input v-model="form.models_path" type="text" class="input input-bordered w-full bg-slate-50/50 focus:bg-white transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Windows 例如 D:\Models">
+                        <span class="text-xs text-slate-500 mt-2 block">AI 模型文件通常比较大，同样建议放到非系统盘。</span>
+                    </div>
+                </div>
+
+                <div class="divider before:bg-slate-100 after:bg-slate-100 my-8"></div>
+
+                <div class="flex justify-between items-center flex-wrap gap-4">
+                    <div class="flex gap-4">
+                        <a href="javascript:void(0)" onclick="alert('项目架构白皮书（SRE-RELIABILITY.md 和 zen70_deployment_flow.md）已保存在您本地文件夹的 docs/ 目录下，请直接使用记事本或编辑器打开阅读！')" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">查阅架构白皮书</a>
+                        <a href="javascript:void(0)" onclick="faq_modal.showModal()" class="text-sm text-orange-600 hover:text-orange-800 hover:underline font-semibold flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            常见部署疑问与避坑指南 (必看)
+                        </a>
+                    </div>
+                    <button @click="startDeployment" class="btn btn-modern px-8 py-2.5 h-auto min-h-0 rounded-md font-medium text-sm flex items-center gap-2">
+                        开始一键部署
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 步骤2/3: 部署进度与终端 -->
+            <div v-show="isDeploying || isFinished" class="space-y-6 relative z-10 transition-opacity">
+                <div class="flex justify-between items-end mb-2">
+                    <div>
+                        <h2 class="text-xl font-semibold text-slate-800 flex items-center gap-3">
+                            <span v-if="isDeploying" class="loading loading-spinner loading-sm text-blue-600"></span>
+                            <span v-else class="text-green-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                            </span>
+                            {{ isDeploying ? '系统基础设施构建中...' : '服务环境就绪' }}
+                        </h2>
+                        <p class="text-slate-500 text-sm mt-1">
+                            {{ isDeploying ? '正在从源站同步镜像、编译配置文件及拉起容器集群，请勿关闭页面。' : '所有底座与监控组件已离线挂载完毕。' }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="mockup-code terminal h-80 overflow-y-auto w-full rounded-md border border-slate-700" ref="terminalBox">
+                    <div class="px-5 py-2 sticky top-0 bg-[#0f172a] border-b border-slate-700/50 z-10 text-xs text-slate-400 font-sans tracking-wide">
+                        STDERR / STDOUT 实时流捕获
+                    </div>
+                    <pre v-for="(log, idx) in logs" :key="idx" :class="getLogColor(log)" class="px-5 mt-1"><code>{{ log }}</code></pre>
+                </div>
+
+                <div v-if="isFinished" class="flex justify-end mt-8 fade-in">
+                    <a :href="'http://' + form.domain" target="_blank" class="btn btn-modern px-8 py-2.5 h-auto min-h-0 rounded-md font-medium text-sm flex items-center gap-2">
+                        进入系统控制台
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    </a>
+                </div>
+            </div>
+            
+        </div>
+        
+        <footer class="mt-8 text-center text-xs text-slate-400">
+            &copy; 2026 ZEN70 Open Source Project. 这是一个开源、免费、为了让每个家庭都能拥有 AI 的智能体社区项目。
+        </footer>
+        <!-- 图文教程 Modal -->
+        <dialog id="cf_modal" class="modal modal-bottom sm:modal-middle">
+          <div class="modal-box w-11/12 max-w-4xl bg-slate-50 relative">
+            <form method="dialog">
+              <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-xl mb-6 text-slate-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+                </svg>
+                Cloudflare 终极图文抢险教程 (解决 1033 报错)
+            </h3>
+            
+            <div class="space-y-6 text-sm">
+                <!-- Step 1 -->
+                <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-orange-100 text-orange-600 px-3 py-1 rounded-bl-lg font-bold text-xs">极其重要</div>
+                    <h4 class="font-bold text-lg mb-2 text-slate-800">1. 第一步：只拿密码，千万不要照着图去装软件！</h4>
+                    <p class="text-slate-600 mb-3 block">在这个只属于 Cloudflare 官方的黑框页面里，它会让你下载 <code>.msi</code>、运行命令行... <b>如果这样做了，你就上大当了！不要下载那个东西！</b></p>
+                    <p class="text-slate-600 mb-3 block">你真正要做的：在最下方那段又臭又长的长代码里，<b>用鼠标选中最末尾 <code>eyJh</code> 开头的一串超长火星文，右键复制</b>（不要复制前面的英文命令！）。然后把它粘贴到咱们这个 ZEN70 部署网页的「外网穿透令牌」框里。</p>
+                    <div class="bg-slate-800 text-green-400 p-3 rounded font-mono text-xs overflow-hidden break-all shadow-inner relative">
+                        ... cloudflared.exe service install <span class="text-yellow-300 font-bold bg-slate-700 px-1">eyJh...在这复制超长乱码...</span>
+                    </div>
+                    <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 font-medium flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                        <span>复制完密码后不要关闭，点击网页右下角蓝色的 <b>【Next (下一步)】</b> 或 <b>【Save】</b>！！</span>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+                    <h4 class="font-bold text-lg mb-2 text-red-600 flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        2. 第二步：绑定门牌号（解决 1033 的核心）
+                    </h4>
+                    <p class="text-slate-600 mb-4">绝大部分人在第一步复制完代码就把 Cloudflare 关了，<b>这是致命的大错！</b>你刚才拿了令牌，证明门卫认识这台电脑了，但还要给门卫指出你的「房间号」在哪，否则你访问外网域名就是白屏 Error 1033！</p>
+                    
+                    <ul class="steps steps-vertical w-full ml-2">
+                        <li class="step step-error">
+                            <div class="text-left w-full ml-4">
+                                <b class="block text-slate-800 text-lg">点击 Next 之后，照这样填写「添加路线 (Public Hostname)」：</b>
+                                <div class="bg-blue-50 p-4 border border-blue-200 rounded-md mt-2 flex gap-4 w-full flex-wrap">
+                                    <div class="flex-1 min-w-[300px]">
+                                        <b class="text-slate-700 block mb-2 border-b border-blue-200 pb-1">上层：外网身份</b>
+                                        <div class="mb-1"><span class="inline-block w-24 text-slate-500">Subdomain:</span> 留空不填</div>
+                                        <div class="mb-1"><span class="inline-block w-24 text-slate-500">Domain:</span> 选你的 <b class="text-blue-600">zen70.cn</b></div>
+                                        <div class="mb-1"><span class="inline-block w-24 text-slate-500">Path:</span> 留空不填</div>
+                                    </div>
+                                    <div class="flex-1 min-w-[300px]">
+                                        <b class="text-slate-700 block mb-2 border-b border-blue-200 pb-1">下层：家里暗号 (必须原样填!)</b>
+                                        <div class="mb-1"><span class="inline-block w-20 text-slate-500">服务网址:</span> 直接手动填入 <b class="text-orange-500 bg-orange-100 px-1 font-mono text-base">http://localhost:8000</b></div>
+                                        <div class="text-xs text-slate-400 mt-1">Cloudflare 新版界面把协议和地址合并了，直接把这串完整带 http 的网址打进去即可，千万别写成 https！</div>
+                                    </div>
+                                </div>
+                                <p class="text-red-500 text-sm font-semibold mt-3">填完后点右下角蓝色的 <b>[添加路线 (Save hostname)]</b> 按钮即可！大门彻底打通！</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-action">
+              <form method="dialog">
+                <button class="btn btn-primary px-8">好，我懂了</button>
+              </form>
+            </div>
+          </div>
+        </dialog>
+
+        <!-- 部署避坑与下沉扩展 Modal -->
+        <dialog id="faq_modal" class="modal modal-bottom sm:modal-middle">
+          <div class="modal-box w-11/12 max-w-4xl bg-slate-50 relative h-[80vh] overflow-y-auto">
+            <form method="dialog">
+              <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-xl mb-6 text-slate-800 border-b border-slate-200 pb-3">🚀 ZEN70 部署避坑与下沉扩展完全指南</h3>
+            
+            <div class="space-y-6 text-sm">
+                
+                <!-- FAQ 1: CPU -->
+                <div class="bg-white p-5 rounded-lg border border-red-100 shadow-sm border-l-4 border-l-red-500">
+                    <h4 class="font-bold text-lg mb-2 text-slate-800">🛑 避坑 1：刚点完部署 CPU 怎么疯了？电脑会卡死吗？</h4>
+                    <p class="text-slate-600 mb-2"><b>真相：</b>这其实是你的杀毒软件（比如 Windows Defender 的 <code>MsMpEng.exe</code>）在作祟！系统拉起海量架构文件时，杀毒软件这种“死心眼”会疯狂扫描每一个针眼大的读写动作，活活累死 CPU。</p>
+                    <div class="bg-slate-50 p-3 rounded mt-2 border border-slate-200">
+                        <b class="text-slate-700">🌟 终极解决方案（极大提升部署速度）：</b>
+                        <ul class="list-decimal pl-5 mt-1 text-slate-600 space-y-1">
+                            <li>按 <code>Win键</code> 搜索并打开 <b>Windows 安全中心</b>。</li>
+                            <li>进入 <b>病毒和威胁防护</b> -> 点击蓝色的 <b>管理设置</b>。</li>
+                            <li>滚动到底部 <b>排除项</b> -> 点击 <b>添加或删除排除项</b>。</li>
+                            <li>点击 <b>[+添加排除项]</b> -> 选 <b>[文件夹]</b>，把你放刚下载的这些代码的那个文件夹选进去！</li>
+                        </ul>
+                        <p class="text-red-500 font-semibold mt-2 text-xs">加入白名单后，CPU 立刻释放性能恢复安静，系统部署直接起飞！</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 2: 下沉 -->
+                <div class="bg-white p-5 rounded-lg border border-blue-100 shadow-sm border-l-4 border-l-blue-500">
+                    <h4 class="font-bold text-lg mb-2 text-slate-800">🛑 避坑 2：以后接入十几个传感器和大模型，主机会烧坏吗？</h4>
+                    <p class="text-slate-600 mb-2"><b>ZEN70 的极客级分离架构了解一下！</b></p>
+                    <p class="text-slate-600 mb-3">你现在部署的机器只是一台“发号施令的长官”。真正脏活累活绝对轮不到它！系统原生支持【算力下沉部署】：</p>
+                    
+                    <div class="flex gap-4 flex-wrap">
+                        <div class="flex-1 min-w-[250px] bg-slate-50 p-3 rounded border border-slate-200">
+                            <b class="text-blue-700">🤖 AI 算力剥离（云端/独立显卡机器）</b>
+                            <p class="text-slate-500 mt-1 text-xs">如果要在本地跑重型对话模型，找局域网另一台二手显卡矿机装好 Ollama。在这台主机的管理页面里填上那台矿机的 IP 即可，AI 算力立马实现物理转移，本地主控0负担！</p>
+                        </div>
+                        <div class="flex-1 min-w-[250px] bg-slate-50 p-3 rounded border border-slate-200">
+                            <b class="text-blue-700">📡 传感器边缘下沉（一百块买个废路由器）</b>
+                            <p class="text-slate-500 mt-1 text-xs">强烈不建议把全屋蓝牙温度计网关直接插在主控上。<b>未来你只要在面板里点【添加下沉节点】，系统就会全自动生成一行神奇的代码！</b>你把它粘进小树莓派的回车里，树莓派瞬间变成边缘侦察兵，自动把轻巧的情报连回司令部！<b>(完全不用你自己亲自写一行代码！)</b></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ 3: Cloudflare -->
+                <div class="bg-white p-5 rounded-lg border border-orange-100 shadow-sm border-l-4 border-l-orange-500">
+                    <h4 class="font-bold text-lg mb-2 text-slate-800">🛑 避坑 3：报错 1033！外网访问失败？</h4>
+                    <p class="text-slate-600 mb-2">如果你的隧道连接成功（Terminal 不报错），但手机用流量访问却看到 Cloudflare 发来的白屏 Error 1033 错误。</p>
+                    <p class="text-slate-600">那是因为门卫还不认识你的门牌号！请退出去，点击【外网穿透令牌】密码框旁边的蓝色小按钮 <b>"不会填？看图文教程"</b> 照做最后一步（Service 填 HTTP，URL 填 <code>localhost:8000</code>）。</p>
+                </div>
+
+            </div>
+            <div class="modal-action">
+              <form method="dialog">
+                <button class="btn border-slate-300 text-slate-600 hover:bg-slate-100 px-8">我已阅读并知晓避坑指南</button>
+              </form>
+            </div>
+          </div>
+        </dialog>
+
+    </div>
+
+    <script>
+        const { createApp, ref, nextTick, onMounted } = Vue
+
+        createApp({
+            setup() {
+                const form = ref({
+                    domain: '',
+                    tunnel_token: '',
+                    media_path: '',
+                    models_path: ''
+                });
+
+                onMounted(() => {
+                    const isWindows = navigator.platform.toLowerCase().includes('win');
+                    if (isWindows) {
+                        form.value.media_path = 'D:\\ZEN70_Media';
+                    }
+                });
+
+                const isDeploying = ref(false);
+                const isFinished = ref(false);
+                const logs = ref([]);
+                const terminalBox = ref(null);
+
+                const getLogColor = (log) => {
+                    const l = log.toLowerCase();
+                    if(l.includes("error") || l.includes("failed") || l.includes("fatal")) return "text-red-400";
+                    if(l.includes("warn")) return "text-yellow-400";
+                    if(l.includes("success") || l.includes("ok") || l.includes("[eof]") || l.includes("done")) return "text-emerald-400";
+                    if(l.includes("[installer]")) return "text-blue-300";
+                    return "text-slate-300";
+                };
+
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        if (terminalBox.value) {
+                            terminalBox.value.scrollTop = terminalBox.value.scrollHeight;
+                        }
+                    });
+                };
+
+                const startDeployment = () => {
+                    const finalDomain = (form.value.domain || 'home.zen70.local').trim();
+
+                    isDeploying.value = true;
+                    logs.value = ["ZEN70 编译集群调度中，请求已分发至底层 Daemon..."];
+
+                    const queryParams = new URLSearchParams({
+                        domain: finalDomain,
+                        tunnel_token: form.value.tunnel_token,
+                        media_path: (form.value.media_path || '').trim() || '/mnt/media',
+                        models_path: (form.value.models_path || '').trim() || '/mnt/models'
+                    }).toString();
+
+                    const evtSource = new EventSource(`/api/logs?${queryParams}`);
+                    
+                    evtSource.onmessage = (event) => {
+                        let data = event.data;
+                        if(data.startsWith("[EOF]")) {
+                            evtSource.close();
+                            isDeploying.value = false;
+                            isFinished.value = true;
+                        }
+                        if(data) {
+                            logs.value.push(data);
+                            scrollToBottom();
+                        }
+                    };
+                    
+                    evtSource.onerror = (err) => {
+                        console.error("EventSource failed:", err);
+                        logs.value.push("[FATAL] 部署管道连接断开，请检查网络层或后台服务状态。");
+                        evtSource.close();
+                        isDeploying.value = false;
+                    };
+                };
+
+                return {
+                    form,
+                    isDeploying,
+                    isFinished,
+                    logs,
+                    terminalBox,
+                    startDeployment,
+                    getLogColor
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

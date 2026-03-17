@@ -1,0 +1,44 @@
+# ZEN70 全局配置 (v1) - 触发自动迁移至 v2
+# 敏感信息使用占位，禁止明文
+
+config_version: 1
+
+services:
+  postgres:
+    enabled: true
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    enabled: true
+    image: redis:7-alpine
+    environment: {}
+    volumes:
+      - redis_data:/data
+
+  gateway:
+    enabled: true
+    image: zen70/gateway:latest
+    # 安全基线（.cursorrules 3.3）：非 root、只读根、cap_drop
+    security:
+      apply_baseline: true
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+storage:
+  media:
+    path: /mnt/media
+  postgres_data:
+    path: /var/lib/postgresql/data
+
+network:
+  domain: home.zen70.cn

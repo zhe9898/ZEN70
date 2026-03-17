@@ -1,0 +1,392 @@
+# ZEN70 全局单一事实来源 (Single Source of Truth)
+# 严禁明文机密，密码/Token 必须使用 ${ENV_VAR} 占位，由点火脚本注入 .env
+# 严禁出现硬件型号，仅使用能力标签（vram_mb、tags 等）
+
+version: "1.0"
+config_version: 2
+
+# ---------------------------------------------------------------------------
+# 供应链安全（法典 1.1）：私有镜像仓库，镜像校验
+# 启用后镜像从 registry_url 拉取；认证由 REGISTRY_USER/REGISTRY_PASSWORD 注入
+# ---------------------------------------------------------------------------
+registry:
+  enabled: false
+  url: "${REGISTRY_URL}"
+
+# ---------------------------------------------------------------------------
+# 容灾备份开关（控制 scripts/backup.py 引擎行为）
+# ---------------------------------------------------------------------------
+backup:
+  enabled: false
+
+# ---------------------------------------------------------------------------
+# 网络声明（根节点，法典 1.2 核心拓扑结构）
+# frontend_net：桥接，供反向代理与隧道出入
+# backend_net：内部隔离 (internal: true)，阻断直连外网
+# ---------------------------------------------------------------------------
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+    internal: true
+
+# ---------------------------------------------------------------------------
+# 网络与域名
+# ---------------------------------------------------------------------------
+network:
+  domain: home.zen70.cn
+  internal_host: 192.168.1.100
+  tunnel_enabled: true
+
+# ---------------------------------------------------------------------------
+# 硬件能力标签（绝对解耦：不写型号，只写能力）
+# ---------------------------------------------------------------------------
+capabilities:
+  # 算力能力：显存、编码等，供调度与熔断决策
+  compute:
+    vram_mb: 8192
+    # 能力标签：gpu_nvenc_v1 = 支持 NVENC 的 GPU，供转码/推理选用
+    tags:
+    - gpu_nvenc_v1
+  # 存储能力：仅路径与容量抽象
+  storage:
+    media_path: D:\ZEN70_Media
+    min_free_gb: 10
+  # 可选：多节点时按 node_id 区分
+  # nodes:
+  #   master:
+  #     tags: [gpu_nvenc_v1]
+  #     vram_mb: 8192
+
+# ---------------------------------------------------------------------------
+# 探针路径与挂载映射（路径解耦：唯一事实来源，禁止在代码中硬编码路径）
+# compiler 将写入 .env：MOUNT_CONTAINER_MAP、WATCH_TARGETS
+# ---------------------------------------------------------------------------
+sentinel:
+  mount_container_map:
+    /mnt/cctv: zen70-frigate
+    D:\ZEN70_Media: zen70-jellyfin
+  switch_container_map:
+    media: zen70-jellyfin
+    vision: zen70-frigate
+    llm: zen70-ollama
+  watch_targets:
+    media_engine:
+    - D:\ZEN70_Media
+    - 
+    - 1
+    ai_vision:
+    - /mnt/models
+    - 
+    - 1
+services:
+  caddy:
+    enabled: true
+    image: caddy:2-alpine
+    networks:
+    - frontend_net
+    - backend_net
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+    - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+    - ./frontend/dist:/var/www/html:ro
+    - caddy_data:/data
+    - caddy_config:/config
+
+  postgres:
+    enabled: true
+    image: postgres:15-alpine
+    networks:
+    - backend_net
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+
+  pgbouncer:
+    enabled: true
+    image: edoburu/pgbouncer:1.22.1
+    networks:
+    - backend_net
+    environment:
+      DB_USER: "${POSTGRES_USER}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DB_HOST: "postgres"
+      DB_NAME: "${POSTGRES_DB}"
+      POOL_MODE: "transaction"
+      MAX_CLIENT_CONN: "100"
+      DEFAULT_POOL_SIZE: "20"
+      LISTEN_PORT: "5432"
+    depends_on:
+    - postgres
+
+  redis:
+    enabled: true
+    image: redis:7-alpine
+    networks:
+    - backend_net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "800mb", "--maxmemory-policy", "allkeys-lru", "--aclfile", "/data/users.acl"]
+    volumes:
+    - redis_data:/data
+    - ./config/users.acl:/data/users.acl:ro
+
+  # 核心 API 网关（法典 1.1 彻底容器化，仅 backend_net）
+  gateway:
+    enabled: true
+    security:
+      apply_baseline: true
+      user: "${PUID:-1000}:${PGID:-1000}"
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: zen70-gateway:latest
+    networks:
+    - backend_net
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      AI_BACKEND_URL: "${AI_BACKEND_URL}"
+    depends_on:
+    - redis
+
+  # 公网访问隧道：必须配置 TUNNEL_TOKEN，严禁在 YAML 中硬编码（法典 8.1.2）
+  cloudflared:
+    enabled: true
+    image: "cloudflare/cloudflared:latest"
+    command: "tunnel --no-autoupdate run"
+    networks:
+    - frontend_net
+    - backend_net
+    environment:
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN}"
+
+  # 可观测性基石：时序数据库 (VictoriaMetrics)
+  victoriametrics:
+    enabled: true
+    image: victoriametrics/victoria-metrics:latest
+    networks:
+    - backend_net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    command:
+    - "-storageDataPath=/vmetrics"
+    - "-retentionPeriod=1y"
+    volumes:
+    - victoriametrics_data:/vmetrics
+
+  # SRE大盘 (Grafana)
+  grafana:
+    enabled: true
+    image: grafana/grafana:latest
+    networks:
+    - backend_net
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin # 此处默认即可，不对公网暴露
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+    - grafana_data:/var/lib/grafana
+    - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+
+  # Docker Socket Proxy 安全抽象层
+  docker-proxy:
+    enabled: true
+    image: tecnativa/docker-socket-proxy:latest
+    networks:
+    - backend_net
+    privileged: true
+    environment:
+      CONTAINERS: "1"
+      SERVICES: "1"
+      TASKS: "1"
+      NETWORKS: "1"
+      NODES: "1"
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # 边缘探针 (Categraf) - 挂载 host PID 与 Docker sock
+  categraf:
+    enabled: true
+    image: flashcatcloud/categraf:latest
+    networks:
+    - backend_net
+    pid: host
+    privileged: true
+    environment:
+      HOST_PROC: /host_proc
+      HOST_SYS: /host_sys
+      DOCKER_HOST: tcp://docker-proxy:2375
+    depends_on:
+    - docker-proxy
+    volumes:
+    - ./config/categraf:/etc/categraf/conf
+    - /:/hostfs:ro
+    - /proc:/host_proc:ro
+    - /sys:/host_sys:ro
+
+  # 日志聚合核心 (Loki)
+  loki:
+    enabled: true
+    image: grafana/loki:latest
+    networks:
+    - backend_net
+    ports:
+    - "3100:3100"
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+    - ./config/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+    - loki_data:/loki
+
+  # 容器日志收集器 (Promtail)
+  promtail:
+    enabled: true
+    image: grafana/promtail:latest
+    networks:
+    - backend_net
+    command: ["-config.file=/etc/promtail/promtail-config.yaml"]
+    volumes:
+    - ./config/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # 告警管理中枢 (Alertmanager)
+  alertmanager:
+    enabled: true
+    image: prom/alertmanager:latest
+    networks:
+    - backend_net
+    ports:
+    - "9093:9093"
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+    - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  # 告警规则评估器 (vmalert)
+  vmalert:
+    enabled: true
+    image: victoriametrics/vmalert:latest
+    networks:
+    - backend_net
+    command:
+    - "-rule=/etc/vmalert/alerts.yml"
+    - "-datasource.url=http://victoriametrics:8428"
+    - "-notifier.url=http://alertmanager:9093"
+    - "-remoteWrite.url=http://victoriametrics:8428"
+    - "-remoteRead.url=http://victoriametrics:8428"
+    depends_on:
+    - victoriametrics
+    - alertmanager
+    volumes:
+    - ./config/vmalert/alerts.yml:/etc/vmalert/alerts.yml:ro
+
+  # =========================================================================
+  # 支柱一：家庭娱乐与媒体中心（法典 §4.1.1 / §4.1.2）
+  # =========================================================================
+
+  # 核心流媒体引擎（默认关闭，需指挥官手动启用）
+  jellyfin:
+    enabled: false
+    image: jellyfin/jellyfin:latest
+    networks:
+    - backend_net
+    environment:
+      JELLYFIN_PublishedServerUrl: "https://${DOMAIN}/jellyfin"
+    # 红线：媒体路径强制 :ro 只读！转码缓存与配置写入独立 SSD 卷
+    volumes:
+    - /mnt/media/movies:/data/movies:ro
+    - /mnt/media/tv:/data/tv:ro
+    - /mnt/media/music:/data/music:ro
+    - jellyfin_config:/config
+    - jellyfin_cache:/cache
+    # GPU 透传：通过能力标签动态匹配，严禁硬编码 /dev/dri/renderD128
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - capabilities: [gpu]
+    depends_on:
+    - caddy
+
+  # 全域物联消息总线（法典 §4.1.4 Mosquitto MQTT）
+  mosquitto:
+    enabled: true
+    image: eclipse-mosquitto:2
+    networks:
+    - backend_net
+    ports:
+    - "1883:1883"
+    - "8883:8883" # 为内部 mTLS 预留端口
+    volumes:
+    - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    - mosquitto_data:/mosquitto/data
+    - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+# ---------------------------------------------------------------------------
+# 存储卷与 backup_tier（critical / media / ephemeral）
+# ---------------------------------------------------------------------------
+storage:
+  caddy_data:
+    path: /data/caddy/data
+    backup_tier: critical
+  caddy_config:
+    path: /data/caddy/config
+    backup_tier: critical
+  postgres_data:
+    path: /var/lib/postgresql/data
+    backup_tier: critical
+  redis_data:
+    path: /data
+    backup_tier: critical
+  victoriametrics_data:
+    path: /var/lib/victoriametrics
+    backup_tier: critical
+  grafana_data:
+    path: /var/lib/grafana
+    backup_tier: critical
+  media:
+    path: /mnt/media
+    backup_tier: media
+  # 日志数据存储，短生命周期
+  loki_data:
+    path: /data/loki
+    backup_tier: ephemeral
+  # 临时/缓存类数据，不参与关键灾备
+  ephemeral:
+    path: /tmp/zen70-cache
+    backup_tier: ephemeral
+  # 流媒体引擎数据
+  jellyfin_config:
+    path: /data/jellyfin/config
+    backup_tier: critical
+  jellyfin_cache:
+    path: /data/jellyfin/cache
+    backup_tier: ephemeral
+  # MQTT 物联总线数据
+  mosquitto_data:
+    path: /data/mosquitto/data
+    backup_tier: critical
+  mosquitto_log:
+    path: /data/mosquitto/log
+    backup_tier: ephemeral

@@ -1,0 +1,284 @@
+# ZEN70 .cursorrules (AI专属全局系统提示词) V2.0 绝对零度版
+
+ZEN70 架构拒绝任何实验性或处于 Beta 阶段的非标技术。全栈技术路线 100% 锚定经过全球顶级互联网企业与开源社区验证的工业级成熟方案。本架构不追求盲目的技术堆砌 
+
+作为开发 AI，你必须绝对遵守以下所有规则，严禁任何形式的妥协与自我发挥。
+
+---
+
+## 第 1 部分：全栈技术路线规约
+
+### 1.1 技术选型红线
+- **禁止**
+：任何 Beta 版、实验性、非标技术。
+- **强制**
+：工业级成熟方案。
+- **全栈清单**
+：
+  - **后端**
+：Python 3.11+ / FastAPI（强制 Pydantic v2）/ PostgreSQL 15+（必须启用 pgvector）/ Redis 7+（开启 AOF）/ Alembic（数据库迁移）。
+  - **前端**
+：Vue 3 (Composition API) + Vite + TypeScript（强制 Pinia）/ PWA。
+  - **容器编排**
+：Docker + docker-compose v3.8+（声明式）。
+  - **可观测性**
+：Categraf + Prometheus + Grafana + Loki。
+  - **备份**
+：Restic + 对象存储（S3 协议）。
+  - **其他**
+：NUT（UPS 联动）、FFmpeg（流媒体转码）。
+
+### 1.2 核心原则
+- **绝对解耦**：软件与硬件型号彻底解耦，硬件以“能力”抽象（如 `gpu_nvenc_v1`
+），IaC 配置中严禁出现具体型号。
+- **IaC 唯一事实来源**：所有配置收束于 `system.yaml`，由配置编译器生成，支持 `conf.d/` 碎片化编译。Jinja2 模板严禁包含复杂业务逻辑。密码/Token 必须用 `${ENV_VAR}` 占位，由点火脚本动态生成注入 `.env`
+，严禁明文机密。
+- **【强制斩杀编排孤儿】**：所有 IaC 自动执行的容器重载命令，必须且只能使用 `docker-compose up -d --remove-orphans`
+，杜绝僵尸容器。
+- **物理防腐**
+：硬件缺失自动降级，容器冻结，维持家庭情绪稳定。探针仅负责应急降级，严禁采集周期指标。
+- **跨端平权**
+：PWA 覆盖所有设备，禁止原生 App。WebAuthn 无密登录。大陆安卓反劫持，iOS 穿透硬解，海外安卓 Media Session。
+- **协议驱动 UI (Schema-Driven)**：前端绝不维护硬编码的控制面板，必须基于 `/api/v1/capabilities` 吐出的 JSON 矩阵动态渲染 (`v-for`
+)，锚定统一 JSON 契约字典。
+- **强制视界折叠渲染 (RBAC UI)**：基于 JWT Role 条件渲染（`v-if`
+）。长辈模式强制屏蔽监控组件并放大交互区，极客模式强制暴露 503 真实状态码与 TraceID。
+
+### 1.3 多源高可用与离线部署
+- **多源重试逻辑**：点火脚本 `bootstrap.py` 严禁单一 `git clone`，必须实装 `try-except`
+ 轮询数组（GitHub -> Gitee -> 自建），确保极寒断网环境 100% 物理自举。
+- **供应链自主**
+：强制私有镜像仓库（Harbor/Registry），配置定时同步。所有拉取的配置与镜像必须通过 Checksum 或签名（cosign）验证。
+
+---
+
+## 第 2 部分：通信与 API 规范
+
+### 2.1 状态同步与网络
+- **强制**：Server-Sent Events (SSE)，**绝对禁止 WebSocket**
+。
+- **强制心跳探活**：前端每 30 秒发送 Ping，后端连续 45 秒未收到 Ping 必须显式调用 `cancel()`
+ 强斩挂起协程，杜绝 FD 耗尽。
+- **【SSE 断线重连与退避】**
+：前端 SSE 连接断开必须实现指数退避重连机制（1s->2s->4s，上限 30s，最多 10 次降级为离线骨架屏）。
+- **【SSE 代理层反缓冲】**：Nginx/Caddy 针对 SSE 路由必须显式关闭代理缓冲（`proxy_buffering off;`），附加 `X-Accel-Buffering: no`
+ 确保零延迟穿透。
+
+### 2.2 API 版本控制与安全响应头
+- **强制**：所有接口带 `/api/v1/` 前缀；强制自动生成 OpenAPI 规范 (`/openapi.json`
+) 并纳入版本控制。
+- **安全响应头**：反向代理必须添加 `Strict-Transport-Security`、`Content-Security-Policy`、`X-Content-Type-Options`
+ 等标准安全头。
+
+### 2.3 统一错误码与追踪
+- **错误码契约**：必须返回 `{"code": "ZEN-xxx", "message": "...", "recovery_hint": "...", "details": {}}`
+。
+- **请求追踪**：所有请求与响应必须包含 `X-Request-ID`
+，用于跨微服务与日志关联。
+
+### 2.4 时钟与时间戳溯源大闸
+- **【强制 NTP 同步预检】**
+：所有节点启动前必须预检 NTP 时间偏移，漂移 >1 秒直接拒绝启动。
+- **时区红线**：后端服务、PostgreSQL、容器时区强绑定 **UTC 标准时间**。API 交互强制使用 `ISO 8601`
+。本地化转换仅在前端渲染最后一秒发生。
+
+### 2.5 结构化日志与优雅启停
+- **JSON 日志防爆**：后端使用 `structlog` 输出 JSON 格式，必须携带 `X-Request-ID`、`caller` 和 `level`。Loki 采集时对敏感字段（密码/Token）自动脱敏。必须在 `daemon.json`
+ 配置 Docker 日志轮转防爆盘。
+- **优雅启停**：后端必须实装 FastAPI Lifespan。拦截 `SIGTERM`
+，安全等待进行中的 I/O 任务完成并释放 DB 连接池。
+
+---
+
+## 第 3 部分：核心机制强制红线
+
+### 3.1 三步极刑熔断顺序（架构绝对红线）
+硬件掉线或温度超限时，网关严禁直接越权操作容器，必须严格按序执行：
+1. **API 层熔断**
+：网关抛出 503 Service Unavailable，拒绝新任务。
+2. **网络层断流**
+：从 Nginx/Caddy 摘除路由屏蔽转发。
+3. **容器级降级**：向底层下发指令（纯 I/O 容器 `docker pause` 包裹 3s 异步超时升级 `SIGKILL`；有状态执行 `docker stop -t 10`
+）。
+
+### 3.2 探针与集群防脑裂机制 (Topology Sentinel)
+- **探针职责**：通过滑动窗口（连续 3 次防抖）检测硬件，写入 PENDING 锁。必须包含三重交叉核验（路径、UUID、容量），核验 UUID 必须调用 Linux 原生命令（`blkid`/`findmnt`
+）。
+- **【探针自愈守护】**：探针容器必须以 `restart: unless-stopped`
+ 运行。探针崩溃期间锁由 Redis TTL 自动消散，由网关接管（悲观静默，读取 LRU 本地副本兜底）。
+- **【严禁边缘节点自决】**
+：工蜂节点断联必须立即降级为“静默待命”，严禁主动杀容器。
+- **【冷启动安全降级】**
+：通电冷拉起时若 Redis 失联，网关必须加载硬编码的“全域安全模式（All-OFF Mode）”放行基础 API，向前端抛出“总线未就绪”警告。
+
+### 3.3 I/O、存储与内核物理大闸
+- **【强制目录预建防夺舍】**：点火脚本必须解析 YAML，在宿主机预建所有挂载卷目录并执行 `chown -R 1000:1000`
+，绝对禁止 Docker 自动创建引发 Root 夺舍。
+- **【强制系统级句柄扩容】**：核心容器编排必须显式配置 `ulimits: nofile=65536:65536`，宿主机同步修改 `/etc/security/limits.conf`，防 `Too many open files`
+。
+- **【强制关闭 Swap】**：点火必须执行 `swapoff -a`
+，禁用虚拟内存，逼迫超限容器立刻 OOM，严防磨损物理 SSD。
+- **【OOM 杀手豁免权】**：探针、网关、Redis 核心容器必须设置 `oom_score_adj: -999`
+，赋予免死金牌。
+- **【Docker 网段防碰撞】**：必须配置 `default-address-pools` 将 Docker IP 池限制在生僻网段（如 `10.200.0.0/16`
+），禁止与局域网/VPN 路由碰撞。
+- **【系统盘 95% 绝对物理熔断】**：系统盘 95% 时，越过网关下发全局只读大闸强行 `pause`
+ 高频组件，绝对防止死锁。
+- **【网络 ACL 与出口限制】**
+：Docker Compose 必须划定独立网络，数据库端口仅限网关访问。必须限制出口流量（Egress）防肉鸡外联。
+- **【电源 100% 刷盘】**：UPS 电量 <20% 触发关机，Redis 必须 `SHUTDOWN` 阻塞落盘，PostgreSQL 必须发送 `CHECKPOINT`
+，严禁依赖异步 BGSAVE。
+
+### 3.4 安全基线与密钥双轨轮转
+- **安全容器规范**：非 root 用户运行、根文件系统只读（`read_only: true`）、`cap_drop: [ALL]`、配置 `healthcheck`
+。配置 Seccomp 与 AppArmor。
+- **物理粉碎**：数据终局销毁必须调用 `shred -u -z -n 3`
+ 覆写物理磁道。
+- **双轨 JWT 轮转**：环境变量维护 `JWT_SECRET_CURRENT` 与 `PREVIOUS`。旧密钥验证通过则自动签发新令牌（`X-New-Token`
+）。前端 Axios 拦截器捕获新 Token 必须挂起请求队列同步覆写。
+
+### 3.5 AI 调度与数据库演进大闸
+- **【并发 DDL 脑裂锁】**：严禁业务容器并发执行 Alembic。`upgrade head` 前必须向 Redis 申请全局互斥锁（`DB_MIGRATION_LOCK`
+），防 PostgreSQL 表结构损毁。
+- **向量解耦**
+：pgvector 索引类型禁止硬编码，支持多版本平滑迁移脚本。
+- **GPU 资源强释放**：由于 `asyncio.cancel()` 无法中断 CUDA，超时必须使用子进程隔离 `terminate()`
+ 保底。
+- **多模态任务绝对幂等性**：异步任务必须携带全局 Task ID 并写入本地持久化去重，处理冲突返回 `409`
+。
+
+### 3.6 前端 PWA 断网生存指南
+- **离线逃生与缓存**：Service Worker 强制 `skipWaiting`；重型媒体流实装 `workbox-range-requests` 插件（206 Partial Content）。断网骨架屏依赖 Dexie.js，强制申请 `navigator.storage.persist()`
+。
+- **【锁屏生命周期强制接管】**：监听 `visibilitychange`，页面 `hidden` 必须调用 `EventSource.close()`
+ 物理掐断 SSE，防止后台锁屏产生僵尸连接耗尽句柄。
+- **局域网求生**
+：WebAuthn 失败降级 PIN 码（5 次错误锁定 IP 15 分钟）。必须缓存局域网直连静态 IP 二维码。
+
+### 3.7 全域自动化 GC 与灾备（防账单黑洞）
+- **【容器级 GC】**：Cron 每周强制 `docker system prune -a --volumes --force --filter "label!=zen70.gc.keep=true"`
+，清扫悬空镜像与废弃卷。
+- **【灾备级 GC】**：Restic 推流后必须执行 `forget --prune`
+ 裁剪快照。保留期必须大于 S3 Object Lock（30天）。PostgreSQL 开启 WAL 归档实现 PITR。
+- **【应用级 GC】**：强制清空多媒体转码残骸；PostgreSQL 配置 `autovacuum` 并低峰期执行 `VACUUM ANALYZE`
+ 释放死元组。
+- **【不可删除区域声明式豁免】**：必须在 IaC 中为核心资产配置 `protected: true`（如 `zen70.gc.keep=true` 标签、Restic `keep-forever` 标签、物理 `/mnt/data/archive`
+ 黑名单目录）。自动化清理与 95% 熔断脚本绝对禁止触碰受保护资产。
+
+---
+
+## 第 4 部分：性能指标与 SRE 契约
+
+| 指标项 | 目标值/红线 | 验证基准 |
+| :--- | :--- | :--- |
+| 
+**API P99 延迟**
+ | ≤500ms（平均 ≤200ms） | 压测工具 (Locust) / Grafana |
+| 
+**SSE 端到端延迟**
+ | ≤1s | 探针触发到前端 UI 响应 |
+| 
+**稳定并发连接数**
+ | ≥1000 | 依赖 ulimits 65536 扩容验证 |
+| 
+**多模态推理熔断** | 8s (超时释放显存) | `MULTIMODAL_TIMEOUT_SECONDS`
+ |
+| 
+**离线骨架屏恢复**
+ | ≤200ms | 物理断网测试 + Dexie 读取 |
+| 
+**系统盘熔断阈值**
+ | 95% (触发只读降级) | Prometheus + 探针越权下发指令 |
+| 
+**UPS 安全关机阈值**
+ | 20% (阻塞落盘停机) | NUT 拔电真实物理演练 |
+
+---
+
+## 第 5 部分：测试与 DevOps 自动化规范
+
+### 5.1 多维测试金字塔
+- **单元与集成 (P0/P1)**：`pytest` + `pytest-asyncio`。集成测试必须拉起 Docker，且**强制显式断言 HTTP 503 熔断状态码与 paused 状态**。使用 `factory_boy`
+ 禁用硬编码数据。
+- **端到端与混沌 (P2/P3)**
+：Playwright 跨端视觉回归测试；Chaos Mesh 定期注入断网、杀容器验证自愈。
+
+### 5.2 安全审计与发布纪律 (CI/CD)
+- **依赖锁定与安全门禁**：后端 `poetry.lock`，前端 `pnpm/yarn.lock`。CI 强制集成 Trivy（基础镜像漏洞阻断）、`pip-audit`/`npm audit`
+。
+- **代码规范门禁**：`black`+`isort`+`flake8` / `ESLint`+`Prettier`
+，复杂度 CC≤15，未通过阻断合并。
+- **自动化语义发布**：遵循 Conventional Commits（`feat:`, `fix:`），由 `release.sh` 自动提取 CHANGELOG、打 Tag、构建签名镜像 (cosign)。**绝对禁止人工打 Tag 发布**
+。
+
+---
+
+## 第 6 部分：架构决策记录 (ADR)
+所有影响物理拓扑、技术选型或核心接口变动的架构决策，必须以 
+`docs/adr/NNNN-标题.md`
+ 的格式留痕，记录背景、决策、理由与后果，作为不可篡改的工程史料。
+
+---
+
+## 第 7 部分：禁止事项（最高级红线大闸）
+
+- ❌ **禁止 依赖人工清理**：严禁手工敲击 `prune` 或 `rm -rf`
+，必须依赖自动化 GC 与声明式豁免。
+- ❌ **禁止 越级或越界操作**：探针绝不能跳过网关 503 直接控制容器；媒体服务对核心卷必须只读；Docker `.sock`
+ 必须通过代理暴露且仅读。
+- ❌ **禁止 脑裂自决与重试风暴**
+：边缘节点断联必须静默待命；前端收到 503 后严禁无限死循环轮询。
+- ❌ **禁止 IaC 脱机与幽灵资产**：禁止 `system.yaml` 存储明文；禁止遗漏 `--remove-orphans`
+；禁止 Docker 默认网段不避让 VPN 路由。
+- ❌ **禁止 忽视物理规律**：禁止未配 NTP 启动；禁止 UPS 断电仅异步保存；禁止未改 `ulimits` 和未 `swapoff -a`
+ 运行高并发节点。
+- ❌ **禁止 业务代码裸奔**：禁止 API 无限流器与大小限制（`max_request_size`
+）；禁止容器无资源上限与心跳；禁止异步队列无全局 Task ID；禁止超过 90 天不轮换密钥。
+- ❌ **禁止 AI 偷懒发挥**：作为开发 AI，绝不允许输出省略号、弱类型、过时库（`os.path`
+），你的每一行代码必须受控于法典。
+
+---
+
+## 第 8 部分：AI 响应与输出交互契约（指令级红线）
+
+作为开发 AI，你在接收到指令后，每次的代码输出必须严格遵循以下纪律：
+
+### 8.1 强迫症级的任务响应模板
+每次输出代码前，必须先提供以下思维链（CoT）结构：
+- **[目标对齐]**
+：说明本任务目的及触及了法典中哪些红线。
+- **[技术要点]**
+：列出核心逻辑、锁机制、异常降级策略。
+- **[潜在风险警告]**
+：以资深 SRE 视角预判该代码在极端场景下的表现。
+- **[完成度 Checklist]**
+：列出前置依赖及测试该代码的 3 个关键步骤。
+
+### 8.2 极致的代码输出纪律
+- ❌ **零省略号重构**
+：修改已有代码必须输出具有完整上下文的代码块，绝不让指挥官“自行拼凑”。
+- ❌ **防 Token 截断机制**
+：超过 150 行的核心文件必须主动拆分为 2-3 个逻辑 Part 分块输出。
+- ❌ **绝对强类型与现代化**：Python 必须 100% Type Hints，前端强制 TypeScript（严禁 `any`）。文件路径强制 `pathlib.Path`
+。
+- ❌ **工程级注释与异常捕获**：所有公开函数必须符合 PEP 257 docstring。每个 I/O 与网络操作必须 `try-except` 包裹，并在 `except`
+ 中抛出标准错误码与 JSON 结构化日志。
+- ❌ **机器可读溯源头 (Machine-Readable Provenance)**
+：在生成的每一个核心文件首行，必须严格按照目标语言的标准注释规范，注入包含版本约束与防篡改警告的标头。
+  **Python 规范示例**
+：
+  ```python
+  # @generated by ZEN70-AI-Agent
+  # @architecture-version: V2.0
+  # @compliance: strict-sre-ruleset
+  # WARNING: Auto-generated core module. Manual modifications may be overwritten by IaC compiler.
+  ```
+  **TypeScript/Vue 规范示例**：
+  ```typescript
+  /**
+   * @generated by ZEN70-AI-Agent
+   * @architecture-version V2.0
+   * @compliance strict-sre-ruleset
+   * @description Auto-generated core module. Do not mutate directly.
+   */
+  ```

@@ -1,0 +1,43 @@
+# ZEN70 容器编排 - 由 config-compiler 生成
+# 生成时间: 2026-03-13 18:11:50
+# 版本: docker-compose v3.8+
+
+version: '3.8'
+
+networks:
+  zen70_net:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: zen70-postgres
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    networks:
+      - zen70_net
+  redis:
+    image: redis:7-alpine
+    container_name: zen70-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - zen70_net
+  gateway:
+    image: zen70/gateway:latest
+    container_name: zen70-gateway
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    ports:
+      - 8000:8000
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - zen70_net

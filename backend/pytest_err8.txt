@@ -1,0 +1,56 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: E:\ZEN70\backend
+plugins: anyio-4.12.1, asyncio-1.3.0, cov-7.0.0, mock-3.15.1, respx-0.22.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/unit/test_alert_manager.py::test_push_to_bark_critical PASSED      [ 12%]
+tests/unit/test_alert_manager.py::test_push_to_bark_warning PASSED       [ 25%]
+tests/unit/test_alert_manager.py::test_alert_manager_info_no_push FAILED [ 37%]
+tests/unit/test_alert_manager.py::test_alert_manager_critical_dispatch FAILED [ 50%]
+tests/unit/test_data_integrity.py::test_compute_sha256 PASSED            [ 62%]
+tests/unit/test_data_integrity.py::test_cpu_load_avoidance PASSED        [ 75%]
+tests/unit/test_data_integrity.py::test_first_run_creates_baseline PASSED [ 87%]
+tests/unit/test_data_integrity.py::test_bit_rot_detection PASSED         [100%]
+
+================================== FAILURES ===================================
+_______________________ test_alert_manager_info_no_push _______________________
+tests\unit\test_alert_manager.py:67: in test_alert_manager_info_no_push
+    res = await trigger_alert_endpoint(payload, mock_settings, mock_db_session, mock_user)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+worker\alert_manager.py:81: in trigger_alert_endpoint
+    audit = SystemLog(
+<string>:4: in __init__
+    ???
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\state.py:596: in _initialize_instance
+    with util.safe_reraise():
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\util\langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\state.py:594: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: in _declarative_constructor
+    raise TypeError(
+E   TypeError: 'operator' is an invalid keyword argument for SystemLog
+____________________ test_alert_manager_critical_dispatch _____________________
+tests\unit\test_alert_manager.py:96: in test_alert_manager_critical_dispatch
+    res = await trigger_alert_endpoint(payload, mock_settings, mock_db_session, mock_user)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+worker\alert_manager.py:81: in trigger_alert_endpoint
+    audit = SystemLog(
+<string>:4: in __init__
+    ???
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\state.py:596: in _initialize_instance
+    with util.safe_reraise():
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\util\langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\state.py:594: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: in _declarative_constructor
+    raise TypeError(
+E   TypeError: 'operator' is an invalid keyword argument for SystemLog
+=========================== short test summary info ===========================
+FAILED tests/unit/test_alert_manager.py::test_alert_manager_info_no_push - Ty...
+FAILED tests/unit/test_alert_manager.py::test_alert_manager_critical_dispatch
+========================= 2 failed, 6 passed in 1.83s =========================

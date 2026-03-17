@@ -1,0 +1,13 @@
+2026-03-15 21:15:19,596 [WARNING] [GATEWAY] AI_BACKEND_URL is not set. AI router will return 503 errors if accessed.
+INFO:     Will watch for changes in these directories: ['E:\\ZEN70']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [39604] using StatReload
+2026-03-15 21:15:20,777 [WARNING] [GATEWAY] AI_BACKEND_URL is not set. AI router will return 503 errors if accessed.
+INFO:     Started server process [39948]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [39948]
+INFO:     Stopping reloader process [39604]

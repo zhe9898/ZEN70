@@ -1,0 +1,30 @@
+
+> zen70-frontend@0.1.0 build
+> vue-tsc --noEmit && vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+
+🌼   [35mdaisyUI[39m [2m4.12.24[22m
+├─ [32m✔︎[39m 6 themes added[2m		https://daisyui.com/docs/themes[22m
+╰─ [32m★[39m [0mStar daisyUI on GitHub[0m	[2mhttps://github.com/saadeghi/daisyui[22m
+
+[32m✓[39m 113 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mmanifest.webmanifest                        [39m[1m[2m  0.48 kB[22m[1m[22m
+[2mdist/[22m[32mindex.html                                  [39m[1m[2m  0.56 kB[22m[1m[22m[2m │ gzip:  0.38 kB[22m
+[2mdist/[22m[35massets/index-wePWG5Kl.css                   [39m[1m[2m 67.92 kB[22m[1m[22m[2m │ gzip: 11.48 kB[22m
+[2mdist/[22m[36massets/FamilyPanel-BDugPqNj.js              [39m[1m[2m  0.32 kB[22m[1m[22m[2m │ gzip:  0.31 kB[22m
+[2mdist/[22m[36massets/Login-Cr8DBz3e.js                    [39m[1m[2m  5.14 kB[22m[1m[22m[2m │ gzip:  2.15 kB[22m
+[2mdist/[22m[36massets/workbox-window.prod.es5-vqzQaGvo.js  [39m[1m[2m  5.72 kB[22m[1m[22m[2m │ gzip:  2.35 kB[22m
+[2mdist/[22m[36massets/AdminPanel-mKt7Y8VQ.js               [39m[1m[2m  9.15 kB[22m[1m[22m[2m │ gzip:  3.88 kB[22m
+[2mdist/[22m[36massets/index-DIPFjN7N.js                    [39m[1m[2m219.83 kB[22m[1m[22m[2m │ gzip: 83.34 kB[22m
+[32m✓ built in 1.66s[39m
+
+PWA v0.17.5
+mode      generateSW
+precache  14 entries (305.52 KiB)
+files generated
+  dist\sw.js
+  dist\workbox-f050b3fa.js

@@ -1,0 +1,22 @@
+# ZEN70 核心镜像列表 - 由 pull-sync.sh 同步至私有仓库
+# 格式：每行一个镜像（可含仓库与标签），空行与 # 开头行忽略
+
+# 基础运行时
+python:3.11-slim
+node:20-slim
+postgres:15-alpine
+redis:7-alpine
+
+# 业务与网关（示例）
+jellyfin/jellyfin:10.8.13
+ghcr.io/blakeblackshear/frigate:stable
+ollama/ollama:latest
+eclipse-mosquitto:2.0.18
+
+# 可观测与代理
+prom/prometheus:v2.45.0
+grafana/grafana:10.0.0
+tecnativa/docker-socket-proxy:latest
+
+# 官方 Registry（用于私有仓库本身）
+registry:2

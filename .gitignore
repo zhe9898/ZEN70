@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.coverage
+*.log
+*.sqlite
+*.db
+backend/venv/
+test_unused.py
+unused.txt
+unused_imports.txt
+*.zip
+*.tar.gz
