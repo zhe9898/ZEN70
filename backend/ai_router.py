@@ -3,18 +3,20 @@
 # @architecture-version: V2.0
 # @compliance: strict-sre-ruleset
 # WARNING: Auto-generated core module. Manual modifications may be overwritten by IaC compiler.
-# 
+#
 # ZEN70 通用 AI 路由代理 (Universal AI Reverse Proxy)。
-# 
+#
 # 1. 零硬编码: AI_BACKEND_URL 全局动态注入，兼容 Ollama/vLLM/OpenAI-like 接口。
 # 2. 并发脑裂锁 (法典 3.5): 强制依赖 X-Idempotency-Key 进行 Redis 级别悲观锁定。
 # 3. 多模态推断 8s 极刑断崖 (法典 4.0): asyncio.wait_for 强制超时释放池化连接。
 
-import os
-import httpx
 import asyncio
-from fastapi import APIRouter, Request, HTTPException, Header
+import os
+
+import httpx
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
 # Remove circular import
 # from .main import get_capabilities_matrix, raise_503_if_pending, ErrorResponse, _get_redis
 
@@ -22,18 +24,20 @@ from fastapi.responses import StreamingResponse
 AI_BACKEND_URL = os.getenv("AI_BACKEND_URL", "").rstrip("/")
 if not AI_BACKEND_URL:
     import logging
+
     logging.warning("AI_BACKEND_URL is not set. AI router will return 503 errors if accessed.")
 
 
-MULTIMODAL_TIMEOUT_SECONDS = 8.0  # 法典 4.0 显存熔断极刑
+MULTIMODAL_TIMEOUT_SECONDS = 30.0  # 法典 4.0 显存熔断极刑 (放宽至30s以适配本地LlaVA等视觉大模型)
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
 # 实例化全局单例的高性能长连接池 (防 FD 泄露)
 http_client = httpx.AsyncClient(
     limits=httpx.Limits(max_keepalive_connections=50, max_connections=100),
-    timeout=httpx.Timeout(connect=2.0, read=None, write=None, pool=2.0)
+    timeout=httpx.Timeout(connect=2.0, read=None, write=None, pool=2.0),
 )
+
 
 async def check_idempotency_lock(request: Request, idempotency_key: str) -> bool:
     """法典 3.5: 幂等性锁。若 Redis 中存在相同 Key，立刻返回 False 阻止执行。"""
@@ -42,7 +46,7 @@ async def check_idempotency_lock(request: Request, idempotency_key: str) -> bool
         # 若 Redis 死机，这里可降级放行，或者严酷拒绝（ZEN70 默认保底层可用性，所以放行或报错均可）
         # 出于防显存打爆的极高安全诉求，我们在没有锁保障时允许执行，但在前端 503 大闸已经兜底
         return True
-        
+
     try:
         lock_key = f"zen70:ai:idemp:{idempotency_key}"
         # setnx: 仅当不存在时设置成功。过期时间 60s 足够涵盖单次推断周期。
@@ -53,30 +57,37 @@ async def check_idempotency_lock(request: Request, idempotency_key: str) -> bool
         return False
     except Exception as e:
         import logging
+
         logging.error(f"Failed to check idempotency lock: {e}")
         return True
 
 
 @router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def universal_ai_proxy(
-    request: Request, 
+    request: Request,
     path: str,
     x_idempotency_key: str = Header(None, description="防并发脑裂幂等性UUID (仅对重型推送有效)"),
     # 按架构法纪：禁止任何硬编码能力标签。必须由调用方明示此请求需要的硬件算力能力。
-    x_capability_target: str = Header(..., alias="X-Capability-Target", description="目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)")
+    x_capability_target: str = Header(
+        ...,
+        alias="X-Capability-Target",
+        description="目标软硬件能力要求(例如 ai_vision, gpu_nvenc_v1)",
+    ),
 ):
     """
     通用代理所有发往 /api/v1/ai/xxx 的请求。
     完美对接 OpenAI 标准格式的 Payload 转发给底层的 Ollama / vLLM。
     """
-    from .main import get_capabilities_matrix, raise_503_if_pending, ErrorResponse
-    from backend.core.jwt import decode_token
     import json
-    
+
+    from backend.core.jwt import decode_token
+
+    from .main import ErrorResponse, get_capabilities_matrix, raise_503_if_pending
+
     # 1. 探针硬件状态拦截 (法典 2.3.2)
     matrix = await get_capabilities_matrix(request)
     raise_503_if_pending(x_capability_target, matrix)
-    
+
     # 2. 并发幂等拦截防重触发 (法典 3.5)
     # 对于推断接口 (尤其是 POST /chat/completions) 强制校验幂等性。
     if request.method in ("POST", "PUT") and x_idempotency_key:
@@ -88,20 +99,20 @@ async def universal_ai_proxy(
                     code="ZEN-AI-4090",
                     message="任务已在处理队列中，严禁重复提交并发请求",
                     recovery_hint="请等待结果返回，若彻底挂死请强制刷新页面重建上下文",
-                    details={"idempotency_key": x_idempotency_key}
-                ).model_dump()
+                    details={"idempotency_key": x_idempotency_key},
+                ).model_dump(),
             )
 
     # 组装底层真实请求 URL
     target_url = f"{AI_BACKEND_URL}/{path}"
-    
+
     # 代理 Headers，并清理掉 FastAPI 注入的 Host，防止底层由于 Host 不符报错
     headers = dict(request.headers)
     headers.pop("host", None)
-    
+
     # 提取内容
     content = await request.body()
-    
+
     # ---------------------------------------------------------
     # 拦截并覆写 Prompt: 儿童启蒙模式大闸 (Family Companion Phase)
     # ---------------------------------------------------------
@@ -113,12 +124,14 @@ async def universal_ai_proxy(
                 user_data, _ = decode_token(token)
             except Exception:
                 user_data = {}
-                
+
             # 法典 9.4: 端云算力切换 (Cloud-Local Hybrid)
             # 如果偏好是 cloud，将 target_url 悄悄变轨到公有云
             route_pref = user_data.get("ai_route_preference", "auto")
             if route_pref == "cloud":
-                public_cloud_url = os.getenv("EXTERNAL_OPENAI_URL", "https://api.openai.com/v1").rstrip("/")
+                public_cloud_url = os.getenv(
+                    "EXTERNAL_OPENAI_URL", "https://api.openai.com/v1"
+                ).rstrip("/")
                 public_cloud_key = os.getenv("EXTERNAL_OPENAI_KEY", "")
                 if public_cloud_key:
                     target_url = f"{public_cloud_url}/{path}"
@@ -132,12 +145,12 @@ async def universal_ai_proxy(
                         # 强行在开头插入一条 System Prompt 覆写人设
                         system_msg = {
                             "role": "system",
-                            "content": "你现在是一个温柔且耐心的家庭启蒙老师。你必须以简单易懂、像童话故事一样生动的方式回答问题。你只能回答科学、教育、自然界的问题。如果遇到不适合儿童的成人话题、暴力血腥或恐怖内容，你必须委婉且坚决地拒绝回答。你的语气必须充满爱心。"
+                            "content": "你现在是一个温柔且耐心的家庭启蒙老师。你必须以简单易懂、像童话故事一样生动的方式回答问题。你只能回答科学、教育、自然界的问题。如果遇到不适合儿童的成人话题、暴力血腥或恐怖内容，你必须委婉且坚决地拒绝回答。你的语气必须充满爱心。",
                         }
                         body_json["messages"].insert(0, system_msg)
                         content = json.dumps(body_json).encode("utf-8")
                         headers["content-length"] = str(len(content))
-            
+
             # --- 长辈物联语音指令提取 (Smart Home IoT) ---
             elif user_data.get("role") in ("长辈", "elder", "family_elder"):
                 if request.method == "POST" and "chat/completions" in path:
@@ -145,7 +158,7 @@ async def universal_ai_proxy(
                     if "messages" in body_json:
                         system_msg = {
                             "role": "system",
-                            "content": '''你是一个智能家居意图解析核心。请分析用户的自然语言请求，并返回纯 JSON 格式的设备控制指令，不要包含任何闲聊和解释代码块。
+                            "content": """你是一个智能家居意图解析核心。请分析用户的自然语言请求，并返回纯 JSON 格式的设备控制指令，不要包含任何闲聊和解释代码块。
 当前可用设备：
 - light_living_1 (客厅主灯)
 - light_bedroom_1 (卧室床头灯)
@@ -155,7 +168,7 @@ async def universal_ai_proxy(
 
 示例输入: "有点黑，帮我把客厅的灯打开"
 示例输出: {"device_id": "light_living_1", "action": "ON"}
-如果你无法意图解析或者设备不存在，请返回 {"error": "unrecognized_command"}'''
+如果你无法意图解析或者设备不存在，请返回 {"error": "unrecognized_command"}""",
                         }
                         body_json["messages"].insert(0, system_msg)
                         # 强制指定 response_format 为 json_object (需受底层模型支持)
@@ -165,9 +178,12 @@ async def universal_ai_proxy(
 
     except Exception as e:
         import logging
-        logging.getLogger("zen70.ai_router").warning(f"AI 拦截器运行失败 (Prompt Override Error): {e}")
+
+        logging.getLogger("zen70.ai_router").warning(
+            f"AI 拦截器运行失败 (Prompt Override Error): {e}"
+        )
     # ---------------------------------------------------------
-    
+
     # 构建转发闭包，以便用于 asyncio.wait_for 包装
     async def _forward_request():
         req = http_client.build_request(
@@ -178,33 +194,38 @@ async def universal_ai_proxy(
         )
         # 流式传输透传
         resp = await http_client.send(req, stream=True)
-        
+
         async def stream_generator():
             try:
                 async for chunk in resp.aiter_bytes():
                     yield chunk
             finally:
                 await resp.aclose()
-                
+
         return StreamingResponse(
-            stream_generator(), 
-            status_code=resp.status_code, 
-            headers={k: v for k, v in resp.headers.items() if k.lower() not in ("content-length", "content-encoding")}
+            stream_generator(),
+            status_code=resp.status_code,
+            headers={
+                k: v
+                for k, v in resp.headers.items()
+                if k.lower() not in ("content-length", "content-encoding")
+            },
         )
 
     # 3. 法典 4.0 显存防刷极刑 (8s Guillotine 大闸)
     # 无论后端计算多沉重，只要超过 8s 直接斩断，并从网关抛出优雅降级。
     try:
         result_response = await asyncio.wait_for(
-            _forward_request(), 
-            timeout=MULTIMODAL_TIMEOUT_SECONDS
+            _forward_request(), timeout=MULTIMODAL_TIMEOUT_SECONDS
         )
         return result_response
     except asyncio.TimeoutError:
         # 法典 1.56: 优雅返回 HTTP 206 Partial Content (纯文本强制截断)，防止前端流式聊天组件抛红
         fallback_msg = f"\n\n[ZEN70: 算力引擎已触及 {MULTIMODAL_TIMEOUT_SECONDS}s 热熔断极刑，由于服务器负载过高，余下部分被截断以保护内存。]"
+
         async def fallback_stream():
             yield fallback_msg.encode("utf-8")
+
         return StreamingResponse(fallback_stream(), status_code=206, media_type="text/plain")
     except httpx.ConnectError:
         raise HTTPException(
@@ -213,8 +234,8 @@ async def universal_ai_proxy(
                 code="ZEN-AI-5002",
                 message="无法连接到底层 AI 推理集群",
                 recovery_hint="请检查 Docker 内部网络 (backend_net) 或容器存活状态",
-                details={"target_url": target_url}
-            ).model_dump()
+                details={"target_url": target_url},
+            ).model_dump(),
         )
     except Exception as e:
         raise HTTPException(
@@ -223,6 +244,6 @@ async def universal_ai_proxy(
                 code="ZEN-AI-5000",
                 message="AI 网关代理服务内部异常",
                 recovery_hint="请通过 X-Request-ID 查询 Loki 详细日志",
-                details={"error": str(e)}
-            ).model_dump()
+                details={"error": str(e)},
+            ).model_dump(),
         )
