@@ -45,7 +45,7 @@ def _gateway_ok() -> bool:
 def _redis_ok() -> bool:
     try:
         import redis
-        c = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+        c = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
         c.ping()
         c.close()
         return True
@@ -75,7 +75,7 @@ def redis_client() -> Generator:
     """会话级 Redis 客户端（decode_responses=True）。"""
     try:
         import redis
-        client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+        client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
         client.ping()
         yield client
         client.close()

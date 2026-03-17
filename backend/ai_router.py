@@ -14,7 +14,7 @@ import os
 import httpx
 import asyncio
 from fastapi import APIRouter, Request, HTTPException, Header
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 # Remove circular import
 # from .main import get_capabilities_matrix, raise_503_if_pending, ErrorResponse, _get_redis
 
