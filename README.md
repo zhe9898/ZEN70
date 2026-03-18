@@ -20,24 +20,17 @@ python start_installer.py
 
 ---
 
-## 🛜 常见网络问题：Docker 镜像拉取超时 (仅限中国大陆)
+## 🛜 中国大陆特供：V2.9 全原厂离线防波堤版 (绝对隔离)
 
-由于网络原因，如果在执行 `docker compose up -d` 时出现类似 `dialing registry-1.docker.io:443 ... A connection attempt failed` 的错误，说明您的 Docker 无法连接到官方镜像库。
+由于 GFW 防火长城对 Docker Hub 的阻断，导致国内直连拉取镜像 100% 会触发超时死锁或 `toomanyrequests` 限流。
+为彻底根治此问题，系统目前已接入 **企业级 GitHub Actions 云端流水线**。所有的编译、拉取、打包工作均在海外云端完成，输出 100% 纯净、幂等的开箱即用离线包。
 
-**Windows Docker Desktop 解决方案：**
-1. 打开 Docker Desktop，点击右上角齿轮 ⚙️ 进入设置。
-2. 左侧导航至 **Docker Engine**。
-3. 在 JSON 配置中加入以下镜像加速器节点：
-```json
-{
-  "registry-mirrors": [
-    "https://docker.1panel.live",
-    "https://docker.m.daocloud.io",
-    "https://hub.rat.dev"
-  ]
-}
-```
-4. 点击 **Apply & restart**。重启完成后，重新执行一键启动脚本即可。
+**极简离线安装流程 (无需任何代理/加速器)：**
+1. 访问我们官方的 Releases 页面：👉 `https://github.com/zhe9898/ZEN70/releases`
+2. 下载最新释出的 **`zen70_v2.9_offline_bundle.zip`** (约 1.5GB)。
+3. 解压缩包至任意目录。
+4. **【核心步骤】**：双击执行 `A_一键导入离线镜像环境(必点).bat`。系统会静默将 15 个原厂容器镜像瞬间打入宿主机 Docker 缓存！
+5. 导入完成后，像往常一样双击 `zen70_start.bat` 一键点火升空，纵享丝滑！
 
 ---
 
