@@ -115,7 +115,7 @@ services:
 
   pgbouncer:
     enabled: true
-    image: edoburu/pgbouncer:1.22.1
+    image: edoburu/pgbouncer:1.22.1-p0
     networks:
     - backend_net
     environment:

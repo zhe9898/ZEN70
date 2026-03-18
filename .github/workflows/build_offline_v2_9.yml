@@ -49,7 +49,7 @@ jobs:
           }
           pull_with_retry caddy:2-alpine
           pull_with_retry postgres:15-alpine
-          pull_with_retry edoburu/pgbouncer:1.22.1
+          pull_with_retry edoburu/pgbouncer:1.22.1-p0
           pull_with_retry redis:7-alpine
           pull_with_retry cloudflare/cloudflared:latest
           pull_with_retry victoriametrics/victoria-metrics:latest
@@ -69,7 +69,7 @@ jobs:
           mkdir -p offline_bundle/ZEN70_V2.9
           docker save -o offline_bundle/ZEN70_V2.9/zen70_offline_images_v2.9.tar \
             zen70-gateway:latest \
-            caddy:2-alpine postgres:15-alpine edoburu/pgbouncer:1.22.1 redis:7-alpine \
+            caddy:2-alpine postgres:15-alpine edoburu/pgbouncer:1.22.1-p0 redis:7-alpine \
             cloudflare/cloudflared:latest victoriametrics/victoria-metrics:latest \
             grafana/grafana:latest tecnativa/docker-socket-proxy:latest flashcatcloud/categraf:latest \
             grafana/loki:latest grafana/promtail:latest prom/alertmanager:latest \
