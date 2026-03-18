@@ -1,4 +1,4 @@
-name: Build V2.9 Offline Bundle
+name: Build V2.9.1 Offline Bundle
 
 on:
   push:
@@ -66,8 +66,8 @@ jobs:
           
       - name: Save images to tar archive
         run: |
-          mkdir -p offline_bundle/ZEN70_V2.9
-          docker save -o offline_bundle/ZEN70_V2.9/zen70_offline_images_v2.9.tar \
+          mkdir -p offline_bundle/ZEN70_V2.9.1
+          docker save -o offline_bundle/ZEN70_V2.9.1/zen70_offline_images_v2.9.1.tar \
             zen70-gateway:latest \
             caddy:2-alpine postgres:15-alpine edoburu/pgbouncer:1.22.1-p0 redis:7-alpine \
             cloudflare/cloudflared:latest victoriametrics/victoria-metrics:latest \
@@ -77,23 +77,23 @@ jobs:
 
       - name: Package Repository
         run: |
-          rsync -a --exclude='.git/' --exclude='offline_bundle/' ./ offline_bundle/ZEN70_V2.9/
+          rsync -a --exclude='.git/' --exclude='offline_bundle/' ./ offline_bundle/ZEN70_V2.9.1/
           cd offline_bundle
-          zip -r zen70_v2.9_offline_bundle.zip ZEN70_V2.9/
+          zip -r zen70_v2.9.1_offline_bundle.zip ZEN70_V2.9.1/
           
       - name: Create Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Verifying archive size before upload:"
-          ls -lh offline_bundle/zen70_v2.9_offline_bundle.zip || exit 1
+          ls -lh offline_bundle/zen70_v2.9.1_offline_bundle.zip || exit 1
           
-          echo "Ensuring release v2.9 exists..."
-          gh release create v2.9 --title "ZEN70 V2.9 (Offline Docker Bundle)" --notes "Automated True-Offline Container Release" || echo "Release already exists or creation skipped (422), continuing to upload..."
+          echo "Ensuring release v2.9.1 exists..."
+          gh release create v2.9.1 --title "ZEN70 V2.9.1 (Offline Docker Bundle)" --notes "Automated True-Offline Container Release" || echo "Release already exists or creation skipped (422), continuing to upload..."
           
           echo "Uploading asset and overwriting if exists..."
           for i in {1..3}; do
-            if gh release upload v2.9 offline_bundle/zen70_v2.9_offline_bundle.zip --clobber; then
+            if gh release upload v2.9.1 offline_bundle/zen70_v2.9.1_offline_bundle.zip --clobber; then
               echo "Upload successful!"
               exit 0
             fi
