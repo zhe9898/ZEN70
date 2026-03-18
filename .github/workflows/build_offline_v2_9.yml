@@ -34,22 +34,35 @@ jobs:
 
       - name: Pull Required Public Docker Images
         run: |
-          docker pull caddy:2-alpine || sleep 10 && docker pull caddy:2-alpine
-          docker pull postgres:15-alpine || sleep 10 && docker pull postgres:15-alpine
-          docker pull edoburu/pgbouncer:1.22.1 || sleep 10 && docker pull edoburu/pgbouncer:1.22.1
-          docker pull redis:7-alpine || sleep 10 && docker pull redis:7-alpine
-          docker pull cloudflare/cloudflared:latest || sleep 10 && docker pull cloudflare/cloudflared:latest
-          docker pull victoriametrics/victoria-metrics:latest || sleep 10 && docker pull victoriametrics/victoria-metrics:latest
-          docker pull grafana/grafana:latest || sleep 10 && docker pull grafana/grafana:latest
-          docker pull tecnativa/docker-socket-proxy:latest || sleep 10 && docker pull tecnativa/docker-socket-proxy:latest
-          docker pull flashcatcloud/categraf:latest || sleep 10 && docker pull flashcatcloud/categraf:latest
-          docker pull grafana/loki:latest || sleep 10 && docker pull grafana/loki:latest
-          docker pull grafana/promtail:latest || sleep 10 && docker pull grafana/promtail:latest
-          docker pull prom/alertmanager:latest || sleep 10 && docker pull prom/alertmanager:latest
-          docker pull victoriametrics/vmalert:latest || sleep 10 && docker pull victoriametrics/vmalert:latest
-          docker pull eclipse-mosquitto:2 || sleep 10 && docker pull eclipse-mosquitto:2
-          docker pull python:3.12-slim || sleep 10 && docker pull python:3.12-slim
-          docker pull jellyfin/jellyfin:latest || sleep 10 && docker pull jellyfin/jellyfin:latest
+          pull_with_retry() {
+            local img=$1
+            for i in {1..5}; do
+              if docker pull "$img"; then
+                echo "Successfully pulled $img"
+                return 0
+              fi
+              echo "Rate limit hit or failure. Retrying $img in 20s... ($i/5)"
+              sleep 20
+            done
+            echo "FATAL: Could not pull $img"
+            exit 1
+          }
+          pull_with_retry caddy:2-alpine
+          pull_with_retry postgres:15-alpine
+          pull_with_retry edoburu/pgbouncer:1.22.1
+          pull_with_retry redis:7-alpine
+          pull_with_retry cloudflare/cloudflared:latest
+          pull_with_retry victoriametrics/victoria-metrics:latest
+          pull_with_retry grafana/grafana:latest
+          pull_with_retry tecnativa/docker-socket-proxy:latest
+          pull_with_retry flashcatcloud/categraf:latest
+          pull_with_retry grafana/loki:latest
+          pull_with_retry grafana/promtail:latest
+          pull_with_retry prom/alertmanager:latest
+          pull_with_retry victoriametrics/vmalert:latest
+          pull_with_retry eclipse-mosquitto:2
+          pull_with_retry python:3.12-slim
+          pull_with_retry jellyfin/jellyfin:latest
           
       - name: Save images to tar archive
         run: |
