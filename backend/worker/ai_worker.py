@@ -9,9 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 # 1. 初始化日志
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ai_worker")
 
 model_instance = None
@@ -26,9 +24,7 @@ def get_model():
         from sentence_transformers import SentenceTransformer
 
         MODEL_NAME = "clip-ViT-B-32-multilingual-v1"
-        logger.info(
-            f"Loading {MODEL_NAME} model into memory... (This may take a while and ~2GB RAM)"
-        )
+        logger.info(f"Loading {MODEL_NAME} model into memory... (This may take a while and ~2GB RAM)")
         model_instance = SentenceTransformer(MODEL_NAME)
         logger.info("Model loaded successfully.")
         HAS_MODEL = True
@@ -62,9 +58,7 @@ async def process_pending_assets():
     """定期轮询数据库扫描还未进行向量嵌入的照片，并逐个消化。"""
     async with AsyncSessionLocal() as session:
         # 1. 捞取最多 10 张待处理状态 (M9.1)
-        result = await session.execute(
-            select(Asset).where(Asset.embedding_status == "pending").limit(10)
-        )
+        result = await session.execute(select(Asset).where(Asset.embedding_status == "pending").limit(10))
         assets = result.scalars().all()
 
         if not assets:

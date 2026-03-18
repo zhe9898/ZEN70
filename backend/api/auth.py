@@ -92,18 +92,14 @@ async def sys_status(db: AsyncSession | None = Depends(get_db)) -> dict[str, Any
 
 
 @router.post("/bootstrap", response_model=TokenResponse)
-async def bootstrap(
-    req: BootstrapRequest, db: AsyncSession | None = Depends(get_db), redis=Depends(get_redis)
-) -> TokenResponse:
+async def bootstrap(req: BootstrapRequest, db: AsyncSession | None = Depends(get_db), redis=Depends(get_redis)) -> TokenResponse:
     """初始化第一个管理员账户。只有在库为空时可用。"""
     require_db_redis(db, redis)
     result = await db.execute(select(User).limit(1))
     if result.scalar_one_or_none() is not None:
         raise zen(CODE_FORBIDDEN, "System already initialized", status.HTTP_403_FORBIDDEN)
 
-    hashed_pw = bcrypt.hashpw(
-        req.password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
-    ).decode("utf-8")
+    hashed_pw = bcrypt.hashpw(req.password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("utf-8")
     user = User(
         username=req.username,
         display_name=req.display_name,
@@ -240,9 +236,7 @@ async def register_begin(
     options_dict = json.loads(options_json_str)
     payload = json.dumps({"user_id": user.id, "username": user.username, "flow": "register"})
     if not await redis.set_auth_challenge(challenge_b64, payload, ttl=CHALLENGE_TTL):
-        raise zen(
-            CODE_SERVER_ERROR, "Failed to store challenge", status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        raise zen(CODE_SERVER_ERROR, "Failed to store challenge", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     log_auth("webauthn_register_begin", True, rid, username=req.username, client_ip_str=cip)
     return WebAuthnRegisterBeginResponse(options=options_dict)
@@ -277,11 +271,7 @@ async def register_complete(
         raise zen(CODE_BAD_REQUEST, "Registration verification failed", status.HTTP_400_BAD_REQUEST)
 
     credential_id_b64 = bytes_to_base64url(verification.credential_id)
-    device_name = (
-        req.credential.get("deviceName")
-        or (req.credential.get("response") or {}).get("deviceName")
-        or "unknown"
-    )[:128]
+    device_name = (req.credential.get("deviceName") or (req.credential.get("response") or {}).get("deviceName") or "unknown")[:128]
     cred = WebAuthnCredential(
         user_id=int(user_id),
         credential_id=credential_id_b64,
@@ -308,9 +298,7 @@ async def login_begin(
     rid, cip = request_id(request), client_ip(request)
     await check_webauthn_rate_limit(redis, cip, rid)
 
-    result = await db.execute(
-        select(User).where(User.username == req.username).options(selectinload(User.credentials))
-    )
+    result = await db.execute(select(User).where(User.username == req.username).options(selectinload(User.credentials)))
     user = result.scalar_one_or_none()
     if not user:
         log_auth("webauthn_login_begin", False, rid, username=req.username, detail="user_not_found")
@@ -320,19 +308,12 @@ async def login_begin(
         log_auth("webauthn_login_begin", False, rid, username=req.username, detail="no_credentials")
         raise zen(CODE_NOT_FOUND, "No credentials found for user", status.HTTP_404_NOT_FOUND)
 
-    allow_credentials = [
-        {"id": c.credential_id, "type": "public-key", "transports": ["internal", "usb", "nfc"]}
-        for c in creds
-    ]
-    _, challenge_b64, options_json_str = generate_authentication_challenge(
-        allow_credentials=allow_credentials
-    )
+    allow_credentials = [{"id": c.credential_id, "type": "public-key", "transports": ["internal", "usb", "nfc"]} for c in creds]
+    _, challenge_b64, options_json_str = generate_authentication_challenge(allow_credentials=allow_credentials)
     options_dict = json.loads(options_json_str)
     payload = json.dumps({"user_id": user.id, "username": user.username, "flow": "login"})
     if not await redis.set_auth_challenge(challenge_b64, payload, ttl=CHALLENGE_TTL):
-        raise zen(
-            CODE_SERVER_ERROR, "Failed to store challenge", status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        raise zen(CODE_SERVER_ERROR, "Failed to store challenge", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     log_auth("webauthn_login_begin", True, rid, username=req.username, client_ip_str=cip)
     return WebAuthnLoginBeginResponse(options=options_dict)
@@ -350,9 +331,7 @@ async def login_complete(
     rid, cip = request_id(request), client_ip(request)
     await check_webauthn_rate_limit(redis, cip, rid)
 
-    challenge_b64, data = await consume_challenge(
-        redis, req.credential, "login", username=req.username
-    )
+    challenge_b64, data = await consume_challenge(redis, req.credential, "login", username=req.username)
     cred_id_b64 = credential_id_to_base64url(req.credential)
     if not cred_id_b64:
         raise zen(CODE_BAD_REQUEST, "Invalid credential: missing id", status.HTTP_400_BAD_REQUEST)
@@ -385,9 +364,7 @@ async def login_complete(
         )
     except Exception as e:
         log_auth("webauthn_login_complete", False, rid, username=req.username, detail=str(e))
-        raise zen(
-            CODE_BAD_REQUEST, "Authentication verification failed", status.HTTP_400_BAD_REQUEST
-        )
+        raise zen(CODE_BAD_REQUEST, "Authentication verification failed", status.HTTP_400_BAD_REQUEST)
 
     cred.sign_count = verification.new_sign_count
     body = token_response(str(cred.user_id), req.username, "user")
@@ -417,9 +394,7 @@ async def pin_login(
             client_ip_str=cip,
             detail="not_private_ip",
         )
-        raise zen(
-            CODE_FORBIDDEN, "PIN login only allowed from local network", status.HTTP_403_FORBIDDEN
-        )
+        raise zen(CODE_FORBIDDEN, "PIN login only allowed from local network", status.HTTP_403_FORBIDDEN)
 
     freeze_key = f"pin:freeze:{cip}"
     if await redis.get(freeze_key):
@@ -456,9 +431,7 @@ async def pin_login(
         await _handle_failure("invalid_user_or_no_pin")
 
     pin_bytes = req.pin.encode("utf-8")
-    pin_hash_bytes = (
-        user.pin_hash.encode("utf-8") if isinstance(user.pin_hash, str) else user.pin_hash
-    )
+    pin_hash_bytes = user.pin_hash.encode("utf-8") if isinstance(user.pin_hash, str) else user.pin_hash
     if not bcrypt.checkpw(pin_bytes, pin_hash_bytes):
         await _handle_failure("wrong_pin")
 
@@ -478,9 +451,7 @@ async def pin_set(
 ) -> dict[str, str]:
     """设置或修改当前用户 PIN（需已登录；若账户已有 PIN 则需提供 pin_old）。"""
     if db is None:
-        raise zen(
-            CODE_DB_UNAVAILABLE, "Database not configured", status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        raise zen(CODE_DB_UNAVAILABLE, "Database not configured", status.HTTP_503_SERVICE_UNAVAILABLE)
     rid, cip = request_id(request), client_ip(request)
     username = current_user.get("username")
     if not username:
@@ -493,17 +464,11 @@ async def pin_set(
 
     if user.pin_hash:
         if not req.pin_old:
-            raise zen(
-                CODE_BAD_REQUEST, "pin_old required when changing PIN", status.HTTP_400_BAD_REQUEST
-            )
+            raise zen(CODE_BAD_REQUEST, "pin_old required when changing PIN", status.HTTP_400_BAD_REQUEST)
         pin_old_bytes = req.pin_old.encode("utf-8")
-        hash_bytes = (
-            user.pin_hash.encode("utf-8") if isinstance(user.pin_hash, str) else user.pin_hash
-        )
+        hash_bytes = user.pin_hash.encode("utf-8") if isinstance(user.pin_hash, str) else user.pin_hash
         if not bcrypt.checkpw(pin_old_bytes, hash_bytes):
-            log_auth(
-                "pin_set", False, rid, username=username, client_ip_str=cip, detail="wrong_pin_old"
-            )
+            log_auth("pin_set", False, rid, username=username, client_ip_str=cip, detail="wrong_pin_old")
             raise zen(CODE_UNAUTHORIZED, "Invalid pin_old", status.HTTP_401_UNAUTHORIZED)
 
     user.pin_hash = _hash_pin(req.pin_new)
@@ -553,19 +518,14 @@ async def update_ai_preference(
 
 
 @router.get("/users", response_model=UserListResponse)
-async def list_users(
-    db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)
-) -> UserListResponse:
+async def list_users(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)) -> UserListResponse:
     """列出所有系统用户及其 WebAuthn 设备"""
     result = await db.execute(select(User).options(selectinload(User.credentials)))
     users = result.scalars().all()
 
     user_items = []
     for u in users:
-        creds = [
-            {"id": c.credential_id, "name": c.device_name, "created_at": str(c.created_at)}
-            for c in u.credentials
-        ]
+        creds = [{"id": c.credential_id, "name": c.device_name, "created_at": str(c.created_at)} for c in u.credentials]
         user_items.append(
             UserItem(
                 id=u.id,
@@ -592,9 +552,7 @@ async def create_user(
     if result.scalar_one_or_none():
         raise zen(CODE_BAD_REQUEST, "Username already exists", status.HTTP_400_BAD_REQUEST)
 
-    hashed_pw = bcrypt.hashpw(
-        req.password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
-    ).decode("utf-8")
+    hashed_pw = bcrypt.hashpw(req.password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("utf-8")
     user = User(
         username=req.username,
         display_name=req.display_name,
@@ -624,9 +582,7 @@ async def revoke_credential(
     current_admin: dict = Depends(get_current_admin),
 ) -> dict[str, str]:
     """吊销（删除）某个指纹/面容设备凭证防丢"""
-    result = await db.execute(
-        select(WebAuthnCredential).where(WebAuthnCredential.credential_id == credential_id)
-    )
+    result = await db.execute(select(WebAuthnCredential).where(WebAuthnCredential.credential_id == credential_id))
     cred = result.scalar_one_or_none()
     if not cred:
         raise zen(CODE_NOT_FOUND, "Credential not found", status.HTTP_404_NOT_FOUND)
@@ -673,12 +629,8 @@ async def create_invite(
     return InviteResponse(token=token, expires_at=expires_at)
 
 
-@router.post(
-    "/invites/{token}/webauthn/register/begin", response_model=WebAuthnRegisterBeginResponse
-)
-async def invite_webauthn_register_begin(
-    token: str, db: AsyncSession = Depends(get_db), redis=Depends(get_redis)
-) -> WebAuthnRegisterBeginResponse:
+@router.post("/invites/{token}/webauthn/register/begin", response_model=WebAuthnRegisterBeginResponse)
+async def invite_webauthn_register_begin(token: str, db: AsyncSession = Depends(get_db), redis=Depends(get_redis)) -> WebAuthnRegisterBeginResponse:
     """带外传递链接 - 开始注册 WebAuthn"""
     require_db_redis(db, redis)
 
@@ -695,9 +647,7 @@ async def invite_webauthn_register_begin(
     if not user:
         raise HTTPException(status_code=404, detail="绑定用户不存在")
 
-    registration_data, state = generate_registration_challenge(
-        user.username, user.display_name or user.username
-    )
+    registration_data, state = generate_registration_challenge(user.username, user.display_name or user.username)
 
     # 存储 Challenge (使用原有的 CHALLENGE_TTL 逻辑，但为了方便与当前操作关联，使用 user_id 键)
     challenge_key = f"webauthn:reg:{user.username}"
@@ -770,9 +720,7 @@ async def invite_webauthn_register_complete(
     await redis.delete(token_key)
 
     # 注册成功后可直接踢给用户一个有效 JWT (可选，此处直接下发)
-    access_token = token_response(
-        user.id, user.username, user.role, request_id(request), user.tenant_id
-    )
+    access_token = token_response(user.id, user.username, user.role, request_id(request), user.tenant_id)
     return {
         "status": "ok",
         "message": "物理绑定完成，Token已销毁",
@@ -782,9 +730,7 @@ async def invite_webauthn_register_complete(
 
 
 @router.post("/invites/{token}/fallback/login")
-async def invite_fallback_login(
-    token: str, request: Request, db: AsyncSession = Depends(get_db), redis=Depends(get_redis)
-) -> dict[str, Any]:
+async def invite_fallback_login(token: str, request: Request, db: AsyncSession = Depends(get_db), redis=Depends(get_redis)) -> dict[str, Any]:
     """带外传递链接 - 大陆安卓设备降级免密直连并销毁 Token"""
     require_db_redis(db, redis)
 
@@ -806,9 +752,7 @@ async def invite_fallback_login(
     # 3. 降级模式：不进行物理绑定，直接放行并销毁凭证
     await redis.delete(token_key)
 
-    access_token = token_response(
-        user.id, user.username, user.role, request_id(request), user.tenant_id
-    )
+    access_token = token_response(user.id, user.username, user.role, request_id(request), user.tenant_id)
     return {
         "status": "ok",
         "message": "免密登入成功 (降级模式)，Token已销毁",

@@ -42,9 +42,7 @@ class Asset(Base):
     # 大小 (bytes)
     file_size_bytes: Mapped[int] = mapped_column(nullable=True)
 
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow, nullable=False
-    )
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -60,9 +58,7 @@ class Asset(Base):
     ai_tags: Mapped[list] = mapped_column(ARRAY(String), nullable=True, default=list)
 
     # 情感高光时刻标记 (Elderly/Family Dashboard 使用)
-    is_emotion_highlight: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, index=True
-    )
+    is_emotion_highlight: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
     # 向量提取状态: pending / processing / done / failed
     embedding_status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)

@@ -105,9 +105,7 @@ async def get_board_messages(
 )
 async def create_board_message(
     payload: BoardMessageCreate,
-    x_idempotency_key: Optional[
-        str
-    ] = None,  # TODO: 法典要求的防抖锁可以通过 router dependency 实施，此处简化
+    x_idempotency_key: Optional[str] = None,  # TODO: 法典要求的防抖锁可以通过 router dependency 实施，此处简化
     db: AsyncSession = Depends(get_db),
     redis: RedisClient | None = Depends(get_redis),
     current_user: User = Depends(get_current_user),
@@ -168,9 +166,7 @@ async def delete_board_message(
     """
     删除一条留言（仅本人或 admin 可删）。
     """
-    stmt = select(FamilyMessage).where(
-        FamilyMessage.id == msg_id, FamilyMessage.tenant_id == current_user.tenant_id
-    )
+    stmt = select(FamilyMessage).where(FamilyMessage.id == msg_id, FamilyMessage.tenant_id == current_user.tenant_id)
     result = await db.execute(stmt)
     msg = result.scalar_one_or_none()
 

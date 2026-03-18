@@ -148,9 +148,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
     def __init__(self, provider_type: str, base_url: str = "") -> None:
         self.provider_type = provider_type
         defaults = PROVIDER_DEFAULTS.get(provider_type, {})
-        self.base_url = base_url or os.getenv(
-            defaults.get("env_key", ""), defaults.get("default_url", "")
-        )
+        self.base_url = base_url or os.getenv(defaults.get("env_key", ""), defaults.get("default_url", ""))
 
     async def list_models(self) -> list[dict[str, Any]]:
         if not self.base_url:

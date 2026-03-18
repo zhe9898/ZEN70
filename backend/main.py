@@ -334,10 +334,7 @@ async def bitrot_worker():
                             else:
                                 if row[0] != file_hash:
                                     logger.error(
-                                        f"重大警告: 侦测到静默数据腐败 (Bit-Rot)! "
-                                        f"文件: {filepath} \n"
-                                        f"原哈希: {row[0]} \n"
-                                        f"现哈希: {file_hash}"
+                                        f"重大警告: 侦测到静默数据腐败 (Bit-Rot)! " f"文件: {filepath} \n" f"原哈希: {row[0]} \n" f"现哈希: {file_hash}"
                                     )
                                     # TODO: 接入系统告警总线
                                 else:
@@ -397,9 +394,7 @@ async def health_probe_worker():
                     _service_liveness_fails[svc_name] = _service_liveness_fails.get(svc_name, 0) + 1
 
                     if _service_liveness_fails[svc_name] >= 3:
-                        logger.error(
-                            f"Liveness Probe failed 3 times for {svc_name}. Emitting kill signal."
-                        )
+                        logger.error(f"Liveness Probe failed 3 times for {svc_name}. Emitting kill signal.")
                         # 通知控制平面(Sentinel) 介入强杀与驱逐
                         if r is not None:
                             try:
@@ -652,9 +647,7 @@ async def global_handler(request: Request, exc: Exception):
 
 
 @app.get("/api/v1/capabilities", response_model=Dict[str, CapabilityItem])
-async def capabilities(
-    request: Request, current_user: dict | None = Depends(get_current_user_optional)
-):
+async def capabilities(request: Request, current_user: dict | None = Depends(get_current_user_optional)):
     """
     法典 2.3.1：返回能力矩阵，供前端 v-for 动态渲染。
     法典 3.2.5：Redis 失联时返回 All-OFF 矩阵并带 X-ZEN70-Bus-Status: not-ready 告警。

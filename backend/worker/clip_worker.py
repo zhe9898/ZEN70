@@ -162,9 +162,7 @@ async def process_pending_assets() -> None:
         return
 
     async with _async_session_factory() as db:
-        result = await db.execute(
-            select(Asset).where(Asset.embedding_status == "pending").limit(10)
-        )
+        result = await db.execute(select(Asset).where(Asset.embedding_status == "pending").limit(10))
         assets = result.scalars().all()
         if not assets:
             return
@@ -201,13 +199,9 @@ async def process_pending_assets() -> None:
                 asset.ai_tags = result_extr["tags"]
                 asset.is_emotion_highlight = is_emotion
                 asset.embedding_status = "done"
-                logger.info(
-                    f"✨ 成功提取资产向量与语义标签: {asset.file_path} -> {result_extr['tags']}"
-                )
+                logger.info(f"✨ 成功提取资产向量与语义标签: {asset.file_path} -> {result_extr['tags']}")
             except asyncio.TimeoutError:
-                logger.error(
-                    f"⏰ 极刑熔断：推理超时 ({INFERENCE_TIMEOUT_SECONDS}s) - {asset.file_path}"
-                )
+                logger.error(f"⏰ 极刑熔断：推理超时 ({INFERENCE_TIMEOUT_SECONDS}s) - {asset.file_path}")
                 asset.embedding_status = "failed"
             except Exception as e:
                 logger.error(f"💀 推理异常: {e} - {asset.file_path}")
@@ -220,9 +214,7 @@ async def process_pending_assets() -> None:
 async def main_loop() -> None:
     """Worker 主循环：每 10 秒扫描一次待处理资产"""
 
-    logger.info(
-        f"🚀 CLIP Worker 启动 (timeout={INFERENCE_TIMEOUT_SECONDS}s, device={engine.device})"
-    )
+    logger.info(f"🚀 CLIP Worker 启动 (timeout={INFERENCE_TIMEOUT_SECONDS}s, device={engine.device})")
 
     while True:
         try:

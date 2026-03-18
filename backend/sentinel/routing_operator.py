@@ -18,9 +18,7 @@ from pathlib import Path
 import httpx
 import redis.asyncio as aioredis
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] [ROUTING-OPERATOR] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [ROUTING-OPERATOR] %(message)s")
 logger = logging.getLogger(__name__)
 
 # 配置硬编码，但在实际运行中会依赖系统级 yaml/env 的挂载
@@ -34,9 +32,7 @@ class RoutingOperator:
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
         self.redis_password = os.getenv("REDIS_PASSWORD", None)
         self.project_root = Path(__file__).resolve().parent.parent.parent
-        self.caddy_api_url = (
-            "http://127.0.0.1:2019/load"  # 默认假设在宿主机能反向访问到 Caddy Admin
-        )
+        self.caddy_api_url = "http://127.0.0.1:2019/load"  # 默认假设在宿主机能反向访问到 Caddy Admin
         self.last_hash = ""
 
         # 读取编译器传给 .env 的硬编码字典

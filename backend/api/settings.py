@@ -102,15 +102,9 @@ async def toggle_flag(
         raise HTTPException(status_code=404, detail=f"未知的功能开关: {key}")
 
     new_state = not flag.enabled
-    await db.execute(
-        update(FeatureFlag)
-        .where(FeatureFlag.key == key)
-        .values(enabled=new_state, updated_at=datetime.datetime.utcnow())
-    )
+    await db.execute(update(FeatureFlag).where(FeatureFlag.key == key).values(enabled=new_state, updated_at=datetime.datetime.utcnow()))
     await db.commit()
-    logger.info(
-        f"功能开关 [{key}] 已{'启用' if new_state else '禁用'} by {current_user.get('username', 'unknown')}"
-    )
+    logger.info(f"功能开关 [{key}] 已{'启用' if new_state else '禁用'} by {current_user.get('username', 'unknown')}")
 
     return {
         "status": "ok",
@@ -168,11 +162,7 @@ async def update_config(
     if not config:
         raise HTTPException(status_code=404, detail=f"未知的配置项: {key}")
 
-    await db.execute(
-        update(SystemConfig)
-        .where(SystemConfig.key == key)
-        .values(value=str(new_value), updated_at=datetime.datetime.utcnow())
-    )
+    await db.execute(update(SystemConfig).where(SystemConfig.key == key).values(value=str(new_value), updated_at=datetime.datetime.utcnow()))
     await db.commit()
 
     logger.info(f"配置项 [{key}] 更新为 [{new_value}] by {current_user.get('username', 'unknown')}")
@@ -309,11 +299,7 @@ async def update_provider_url(
     result = await db.execute(select(SystemConfig).where(SystemConfig.key == config_key))
     existing = result.scalars().first()
     if existing:
-        await db.execute(
-            update(SystemConfig)
-            .where(SystemConfig.key == config_key)
-            .values(value=url, updated_at=datetime.datetime.utcnow())
-        )
+        await db.execute(update(SystemConfig).where(SystemConfig.key == config_key).values(value=url, updated_at=datetime.datetime.utcnow()))
     else:
         db.add(
             SystemConfig(
@@ -324,9 +310,7 @@ async def update_provider_url(
         )
     await db.commit()
 
-    logger.info(
-        f"Provider [{provider}] 端点更新为 [{url}] by {current_user.get('username', 'unknown')}"
-    )
+    logger.info(f"Provider [{provider}] 端点更新为 [{url}] by {current_user.get('username', 'unknown')}")
 
     return {
         "status": "ok",
@@ -378,9 +362,7 @@ async def switch_ai_model(
     existing = result.scalars().first()
     if existing:
         await db.execute(
-            update(SystemConfig)
-            .where(SystemConfig.key == config_key)
-            .values(value=f"{provider}:{model_id}", updated_at=datetime.datetime.utcnow())
+            update(SystemConfig).where(SystemConfig.key == config_key).values(value=f"{provider}:{model_id}", updated_at=datetime.datetime.utcnow())
         )
     else:
         db.add(
@@ -392,9 +374,7 @@ async def switch_ai_model(
         )
     await db.commit()
 
-    logger.info(
-        f"AI 模型 [{capability}] 切换为 [{provider}:{model_id}] by {current_user.get('username', 'unknown')}"
-    )
+    logger.info(f"AI 模型 [{capability}] 切换为 [{provider}:{model_id}] by {current_user.get('username', 'unknown')}")
 
     return {
         "status": "ok",

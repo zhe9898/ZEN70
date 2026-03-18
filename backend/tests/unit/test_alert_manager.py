@@ -43,9 +43,7 @@ async def test_push_to_bark_critical():
     bark_url = "https://api.day.app/mock_key"
 
     # Mock the Bark API endpoint to return 200 OK
-    route = respx.get(f"{bark_url}/System%20Failure/Disk%20Rot%20Detected").mock(
-        return_value=Response(200)
-    )
+    route = respx.get(f"{bark_url}/System%20Failure/Disk%20Rot%20Detected").mock(return_value=Response(200))
 
     await push_to_bark(bark_url, "System Failure", "Disk Rot Detected", "critical")
 
@@ -101,9 +99,7 @@ async def test_alert_manager_info_no_push(mock_db_session, mock_settings, mock_u
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_alert_manager_critical_dispatch(
-    mock_db_session, mock_settings, mock_user, mocker, monkeypatch
-):
+async def test_alert_manager_critical_dispatch(mock_db_session, mock_settings, mock_user, mocker, monkeypatch):
     """验证高危事件并行触发 Bark 和 Server酱"""
     payload = AlertPayloadFactory.build(level="critical", title="POWER LOSS", message="UPS dying")
 

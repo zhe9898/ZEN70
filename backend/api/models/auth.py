@@ -19,9 +19,7 @@ class WebAuthnRegisterBeginRequest(BaseModel):
 class WebAuthnRegisterBeginResponse(BaseModel):
     """WebAuthn 注册开始响应：options 可直接传给 navigator.credentials.create()。"""
 
-    options: Dict[str, Any] = Field(
-        ..., description="JSON 格式的 PublicKeyCredentialCreationOptions"
-    )
+    options: Dict[str, Any] = Field(..., description="JSON 格式的 PublicKeyCredentialCreationOptions")
 
 
 class WebAuthnRegisterCompleteRequest(BaseModel):
@@ -39,9 +37,7 @@ class WebAuthnLoginBeginRequest(BaseModel):
 class WebAuthnLoginBeginResponse(BaseModel):
     """WebAuthn 登录开始响应。"""
 
-    options: Dict[str, Any] = Field(
-        ..., description="JSON 格式的 PublicKeyCredentialRequestOptions"
-    )
+    options: Dict[str, Any] = Field(..., description="JSON 格式的 PublicKeyCredentialRequestOptions")
 
 
 class WebAuthnLoginCompleteRequest(BaseModel):
@@ -70,9 +66,7 @@ class PinSetRequest(BaseModel):
     """设置/重置 PIN（需已登录；若有旧 PIN 则必填 pin_old）。"""
 
     pin_new: str = Field(..., min_length=6, max_length=6, description="新 6 位 PIN")
-    pin_old: Optional[str] = Field(
-        default=None, min_length=6, max_length=6, description="旧 PIN，若账户已有 PIN 则必填"
-    )
+    pin_old: Optional[str] = Field(default=None, min_length=6, max_length=6, description="旧 PIN，若账户已有 PIN 则必填")
 
 
 class BootstrapRequest(BaseModel):

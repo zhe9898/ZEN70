@@ -16,18 +16,12 @@ from fastapi import HTTPException, status
 
 ALGORITHM = "HS256"
 _IS_PROD = os.getenv("ZEN70_ENV", "").lower() == "production"
-_CURRENT = (
-    os.getenv("JWT_SECRET_CURRENT")
-    or os.getenv("JWT_SECRET")
-    or ("" if _IS_PROD else "change-me-in-production")
-)
+_CURRENT = os.getenv("JWT_SECRET_CURRENT") or os.getenv("JWT_SECRET") or ("" if _IS_PROD else "change-me-in-production")
 _PREVIOUS = os.getenv("JWT_SECRET_PREVIOUS") or None
 _EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 
 if _IS_PROD and not _CURRENT:
-    raise RuntimeError(
-        "JWT_SECRET_CURRENT or JWT_SECRET must be set in production (ZEN70_ENV=production)"
-    )
+    raise RuntimeError("JWT_SECRET_CURRENT or JWT_SECRET must be set in production (ZEN70_ENV=production)")
 
 
 def _now() -> datetime:

@@ -53,9 +53,7 @@ async def subscribe_push(
     """将前端通过 pushManager 获取的订阅凭证上报持久化到 Postgres"""
 
     # Check if endpoint already exists
-    existing = await session.execute(
-        select(PushSubscription).where(PushSubscription.endpoint == sub_data.endpoint)
-    )
+    existing = await session.execute(select(PushSubscription).where(PushSubscription.endpoint == sub_data.endpoint))
     sub = existing.scalar_one_or_none()
 
     if sub:
@@ -89,9 +87,7 @@ async def test_trigger_push(
     if not VAPID_PRIVATE_KEY:
         raise HTTPException(status_code=503, detail="VAPID keys not configured")
 
-    res = await session.execute(
-        select(PushSubscription).where(PushSubscription.user_id == current_user.id)
-    )
+    res = await session.execute(select(PushSubscription).where(PushSubscription.user_id == current_user.id))
     subs = res.scalars().all()
 
     if not subs:

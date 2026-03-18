@@ -189,9 +189,7 @@ class TopologySentinel:
         # 法典 7.2.1: 边缘节点脑裂防护静默状态 (Stop-Pulling)
         self.is_zombie = False
         self.redis_timeout_count = 0
-        self.max_redis_timeouts = max(
-            2, int(os.getenv("MAX_REDIS_TIMEOUTS", "6"))
-        )  # 默认 6 * 5s = 30s 熔断
+        self.max_redis_timeouts = max(2, int(os.getenv("MAX_REDIS_TIMEOUTS", "6")))  # 默认 6 * 5s = 30s 熔断
 
         self.mounts: List[MountPoint] = []
         mount_points_env = os.getenv("MOUNT_POINTS", "").strip()
@@ -210,10 +208,7 @@ class TopologySentinel:
         self._connect_redis()
 
         if logger:
-            logger.info(
-                f"TopologySentinel initialized mock={self.mock} interval={self.interval}s "
-                f"mounts={len(self.mounts)}"
-            )
+            logger.info(f"TopologySentinel initialized mock={self.mock} interval={self.interval}s " f"mounts={len(self.mounts)}")
 
     def _connect_redis(self) -> None:
         """连接 Redis，失败时指数退避重试（2/4/8/16/32s）后退出。"""
@@ -236,15 +231,10 @@ class TopologySentinel:
                 return
             except Exception as e:
                 if logger:
-                    logger.warning(
-                        f"Redis connection attempt {attempt + 1}/5 failed: {e}, "
-                        f"next retry in {backoff[attempt]}s"
-                    )
+                    logger.warning(f"Redis connection attempt {attempt + 1}/5 failed: {e}, " f"next retry in {backoff[attempt]}s")
                 time.sleep(backoff[attempt])
         if logger:
-            logger.error(
-                "Redis unavailable after retries, entering zombie mode (Split-Brain Prevention)"
-            )
+            logger.error("Redis unavailable after retries, entering zombie mode (Split-Brain Prevention)")
         self.is_zombie = True
 
     def _redis_ok(self) -> bool:
@@ -263,9 +253,7 @@ class TopologySentinel:
             self.redis_timeout_count += 1
             if self.redis_timeout_count >= self.max_redis_timeouts and not self.is_zombie:
                 if logger:
-                    logger.warning(
-                        "Redis ping threshold exceeded, entering zombie mode (Split-Brain Prevention)"
-                    )
+                    logger.warning("Redis ping threshold exceeded, entering zombie mode (Split-Brain Prevention)")
                 self.is_zombie = True
         try:
             self._connect_redis()
@@ -339,9 +327,7 @@ class TopologySentinel:
             if "overheating:NoSchedule" in gpu_taints and "media" in switch_name.lower():
                 if expected_state == "ON":
                     if logger:
-                        logger.warning(
-                            f"Taint Active (overheating). Forcing component '{switch_name}' to OFF to protect node."
-                        )
+                        logger.warning(f"Taint Active (overheating). Forcing component '{switch_name}' to OFF to protect node.")
                     expected_state = "OFF"
 
             # 结合挂载点状态
@@ -361,9 +347,7 @@ class TopologySentinel:
             if should_run and not is_running:
                 # 状态弹簧对齐: 应该跑但没跑 -> docker-compose up
                 if logger:
-                    logger.info(
-                        f"[Reconcile] Diff detected: {container} is OFF but expected ON. Act: compose up"
-                    )
+                    logger.info(f"[Reconcile] Diff detected: {container} is OFF but expected ON. Act: compose up")
                 try:
                     subprocess.run(
                         ["docker-compose", "up", "-d", container],
@@ -378,9 +362,7 @@ class TopologySentinel:
                 # 状态弹簧对齐: 不该跑但跑了 -> docker rm -f 驱逐
                 # 彻底销毁旧实例，下次被唤醒时将完全重演挂载 (Eviction 机制)
                 if logger:
-                    logger.info(
-                        f"[Reconcile] Diff detected: {container} is ON but expected OFF (or Tainted). Act: docker rm -f"
-                    )
+                    logger.info(f"[Reconcile] Diff detected: {container} is ON but expected OFF (or Tainted). Act: docker rm -f")
                 try:
                     subprocess.run(["docker", "rm", "-f", container], timeout=10)
                 except Exception as e:
@@ -562,9 +544,7 @@ class TopologySentinel:
             pubsub = r.pubsub()
             pubsub.subscribe("switch:events")
             if logger is not None:
-                logger.info(
-                    "Topology sentinel starting declarative Redis pub/sub listener on switch:events"
-                )
+                logger.info("Topology sentinel starting declarative Redis pub/sub listener on switch:events")
             for message in pubsub.listen():
                 if message and message.get("type") == "message":
                     data = message.get("data")
@@ -604,9 +584,7 @@ class TopologySentinel:
             t.join(timeout=cycle_timeout)
             if t.is_alive():
                 if logger:
-                    logger.warning(
-                        f"run_once exceeded {cycle_timeout}s, waiting for cycle to finish"
-                    )
+                    logger.warning(f"run_once exceeded {cycle_timeout}s, waiting for cycle to finish")
                 t.join()
             time.sleep(self.interval)
 
@@ -633,14 +611,10 @@ class TopologySentinel:
                 # 2. 如果 Worker 失联超过 15 秒且手头有卡住的任务
                 if idle_ms > 15000 and pending_count > 0:
                     if logger is not None:
-                        logger.warning(
-                            f"🧟‍♂️ [Eviction] Worker {consumer_name} is OFFINE (>15s). Evicting tasks!"
-                        )
+                        logger.warning(f"🧟‍♂️ [Eviction] Worker {consumer_name} is OFFINE (>15s). Evicting tasks!")
 
                     # 3. 查出它卡住的 Message ID
-                    pending_info = r.xpending_range(
-                        stream_key, group_name, "-", "+", pending_count, consumer_name
-                    )
+                    pending_info = r.xpending_range(stream_key, group_name, "-", "+", pending_count, consumer_name)
                     for p in pending_info:
                         msg_id = p.get("message_id")
                         if not msg_id:
@@ -656,9 +630,7 @@ class TopologySentinel:
                                 tombstone_key = f"zen70:tombstone:{command_id}"
                                 r.setex(tombstone_key, 86400, "evicted")
                                 if logger is not None:
-                                    logger.info(
-                                        f"🪦 [Eviction] Tombstone written for dead command: {command_id}"
-                                    )
+                                    logger.info(f"🪦 [Eviction] Tombstone written for dead command: {command_id}")
 
         except Exception as e:
             # Redis 流可能还没初始化，或者命令不支持，容错处理

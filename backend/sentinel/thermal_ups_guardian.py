@@ -21,9 +21,7 @@ logger = logging.getLogger("zen70.sentinel.guardian")
 class SystemGuardian:
     def __init__(self):
         # 假设通过 Categraf 或者内部 API 暴露了 /api/v1/alerts/trigger 接口
-        self.alert_webhook = os.getenv(
-            "ALERT_WEBHOOK_URL", "http://gateway:8000/api/v1/alerts/trigger"
-        )
+        self.alert_webhook = os.getenv("ALERT_WEBHOOK_URL", "http://gateway:8000/api/v1/alerts/trigger")
         self.temperature_threshold = 85.0  # 摄氏度
         self.ups_battery_threshold = 20.0  # 百分比
 

@@ -36,9 +36,7 @@ if POSTGRES_DSN:
         POSTGRES_DSN = POSTGRES_DSN.replace("postgresql://", "postgresql+asyncpg://", 1)
     if os.getenv("DB_OFFLINE_LOCAL") == "1":
         # Force rewrite for Windows port-forwarded offline tasks
-        POSTGRES_DSN = POSTGRES_DSN.replace("@pgbouncer:5432/", "@localhost:5432/").replace(
-            "@postgres:5432/", "@localhost:5432/"
-        )
+        POSTGRES_DSN = POSTGRES_DSN.replace("@pgbouncer:5432/", "@localhost:5432/").replace("@postgres:5432/", "@localhost:5432/")
     config.set_main_option("sqlalchemy.url", POSTGRES_DSN)
 
 import backend.models.asset
@@ -151,9 +149,7 @@ def _acquire_migration_lock() -> "tuple[object, object, threading.Event, threadi
         if lock.acquire(blocking=True, blocking_timeout=60):
             # 成功获取后，拉起看门狗
             stop_event = threading.Event()
-            watchdog = threading.Thread(
-                target=_watchdog_thread, args=(r, lock, stop_event), daemon=True
-            )
+            watchdog = threading.Thread(target=_watchdog_thread, args=(r, lock, stop_event), daemon=True)
             watchdog.start()
             return (r, lock, stop_event, watchdog)
         raise RuntimeError("无法在 60s 内获取 DB_MIGRATION_LOCK，可能有其他节点正在执行迁移")

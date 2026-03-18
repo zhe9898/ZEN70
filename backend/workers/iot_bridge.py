@@ -97,9 +97,7 @@ class IoTBridgeWorker:
         )
         try:
             # 尝试创建流和消费组 (如果已存在会报 BUSYGROUP)
-            await self.redis.xgroup_create(
-                REDIS_STREAM_KEY, CONSUMER_GROUP, id="0-0", mkstream=True
-            )
+            await self.redis.xgroup_create(REDIS_STREAM_KEY, CONSUMER_GROUP, id="0-0", mkstream=True)
             logger.info(f"🟢 [IoT Bridge] 创建/加入 Redis 消费组: {CONSUMER_GROUP}")
         except aioredis.exceptions.ResponseError as e:
             if "BUSYGROUP" in str(e):
@@ -164,9 +162,7 @@ class IoTBridgeWorker:
                 # 【冲突性修复】paho-mqtt 运行在独立的后台线程。
                 # 不能在此线程调用 asyncio.get_event_loop()，必须使用启动时注入的主线程 Loop。
                 if self.loop:
-                    asyncio.run_coroutine_threadsafe(
-                        self._broadcast_sse_state(device_id, state), self.loop
-                    )
+                    asyncio.run_coroutine_threadsafe(self._broadcast_sse_state(device_id, state), self.loop)
                 else:
                     logger.error("🔴 [IoT Bridge] 致命系统冲突：异步事务引擎(Loop)未挂载！")
         except json.JSONDecodeError:
@@ -185,9 +181,7 @@ class IoTBridgeWorker:
                 return
 
             await self.redis.set(f"zen70:iot:state:{device_id}", state)
-            sse_payload = json.dumps(
-                {"device_id": device_id, "state": state, "source": "hardware_ack"}
-            )
+            sse_payload = json.dumps({"device_id": device_id, "state": state, "source": "hardware_ack"})
             await self.redis.publish("zen70:sse:iot_updates", sse_payload)
             logger.info(f"🟢 [IoT Bridge] SSE 物理防抖确认已下发: {device_id} -> {state}")
         except Exception as e:
@@ -206,9 +200,7 @@ class IoTBridgeWorker:
         if command_id:
             is_dead = await self.redis.exists(f"zen70:tombstone:{command_id}")
             if is_dead:
-                logger.warning(
-                    f"🧟 [{trace_id}] [IoT Bridge] 命中墓碑驱逐，丢弃失联期间产生的僵尸指令: {command_id}"
-                )
+                logger.warning(f"🧟 [{trace_id}] [IoT Bridge] 命中墓碑驱逐，丢弃失联期间产生的僵尸指令: {command_id}")
                 await self.redis.xack(REDIS_STREAM_KEY, CONSUMER_GROUP, message_id)
                 return
 
@@ -217,9 +209,7 @@ class IoTBridgeWorker:
             idx_key = f"{IDEMPOTENCY_SET_PREFIX}{command_id}"
             is_new = await self.redis.set(idx_key, "1", nx=True, ex=300)  # 5分钟防重放
             if not is_new:
-                logger.warning(
-                    f"🟡 [{trace_id}] [IoT Bridge] 指令已去重抛弃 (Idempotency Hit): {command_id}"
-                )
+                logger.warning(f"🟡 [{trace_id}] [IoT Bridge] 指令已去重抛弃 (Idempotency Hit): {command_id}")
                 await self.redis.xack(REDIS_STREAM_KEY, CONSUMER_GROUP, message_id)
                 return
 
@@ -264,26 +254,18 @@ class IoTBridgeWorker:
                         trace_id = data.get("trace_id", "unknown")
 
                         try:
-                            logger.debug(
-                                f"[{trace_id}] [IoT Bridge] 收到新指令: {message_id} -> {data}"
-                            )
+                            logger.debug(f"[{trace_id}] [IoT Bridge] 收到新指令: {message_id} -> {data}")
                             await self._handle_command(message_id, data)
                         except Exception as e:
                             retries += 1
-                            logger.error(
-                                f"🔴 [{trace_id}] [IoT Bridge] 指令消费失败 ({retries}/{MAX_RETRIES}): {e}"
-                            )
+                            logger.error(f"🔴 [{trace_id}] [IoT Bridge] 指令消费失败 ({retries}/{MAX_RETRIES}): {e}")
 
                             # 实行衰减重试逻辑与死信拦截 (Poison Pill Prevention)
                             if retries >= MAX_RETRIES:
-                                logger.critical(
-                                    f"🔥 [{trace_id}] [IoT Bridge] 毒药指令超载 (重试 {retries} 次)，强行驱逐至死信队列 DLQ: {message_id}"
-                                )
+                                logger.critical(f"🔥 [{trace_id}] [IoT Bridge] 毒药指令超载 (重试 {retries} 次)，强行驱逐至死信队列 DLQ: {message_id}")
                                 # 追加抛弃原因并推入冷宫，限制 DLQ 长度防止内存核爆
                                 data["dlq_reason"] = str(e)
-                                await self.redis.xadd(
-                                    DLQ_STREAM_KEY, data, maxlen=10000, approximate=True
-                                )
+                                await self.redis.xadd(DLQ_STREAM_KEY, data, maxlen=10000, approximate=True)
                                 # 彻底放弃该消息
                                 await self.redis.xack(REDIS_STREAM_KEY, CONSUMER_GROUP, message_id)
                             else:

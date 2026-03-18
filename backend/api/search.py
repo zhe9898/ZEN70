@@ -57,12 +57,7 @@ async def semantic_search(
 
     # 2. 从数据库中执行高效向量检索
     # 注意: SQL 查询已由 deps.get_db 的 RLS policy 进行租户隔离
-    stmt = (
-        select(Asset)
-        .where(Asset.embedding_status == "done")
-        .order_by(Asset.embedding.cosine_distance(query_vector))
-        .limit(limit)
-    )
+    stmt = select(Asset).where(Asset.embedding_status == "done").order_by(Asset.embedding.cosine_distance(query_vector)).limit(limit)
 
     result = await db.execute(stmt)
     assets = result.scalars().all()
@@ -94,12 +89,7 @@ async def get_emotion_highlights(
     专门为长辈与妻子准备的“情感相册”流端点。
     只抓取含有高光特征 (is_emotion_highlight=True) 的物理录像切片。
     """
-    stmt = (
-        select(Asset)
-        .where(Asset.is_emotion_highlight == True)
-        .order_by(Asset.created_at.desc())
-        .limit(limit)
-    )
+    stmt = select(Asset).where(Asset.is_emotion_highlight == True).order_by(Asset.created_at.desc()).limit(limit)
     result = await db.execute(stmt)
     assets = result.scalars().all()
 

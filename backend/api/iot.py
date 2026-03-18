@@ -88,9 +88,7 @@ async def control_device(
     # 生产环境中可以通过 `ping` Mosquitto 或 HA 探针实现
     proxy_health = await redis.get("zen70:iot:proxy_health")
     if proxy_health == "OFFLINE":
-        logger.warning(
-            f"🔴 [IoT Hub] 拦截指令 {command_id}，中继网络全域掉线 (503 circuit breaker)"
-        )
+        logger.warning(f"🔴 [IoT Hub] 拦截指令 {command_id}，中继网络全域掉线 (503 circuit breaker)")
         # 根据 V2.7 红线，返回 503 静默熔断，同时将心跳异常透传给前端
         raise HTTPException(
             status_code=503,

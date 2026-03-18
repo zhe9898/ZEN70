@@ -162,12 +162,7 @@ async def search_assets(
 
     # === 降级方案：标签匹配（开关关闭时） ===
     # 当 AI 向量搜索未启用时，退化为对 ai_tags 的模糊匹配
-    result = await db.execute(
-        select(Asset)
-        .where(Asset.ai_tags.any(query_text))
-        .order_by(Asset.created_at.desc())
-        .limit(limit)
-    )
+    result = await db.execute(select(Asset).where(Asset.ai_tags.any(query_text)).order_by(Asset.created_at.desc()).limit(limit))
     assets = result.scalars().all()
 
     return {

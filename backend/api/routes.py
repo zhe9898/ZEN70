@@ -164,9 +164,7 @@ async def toggle_switch(
         raise HTTPException(status_code=400, detail="Invalid state, use ON or OFF")
 
     # TODO: 后续应增加 JWT RBAC 鉴权，目前假定有权限
-    await redis.set_switch(
-        name, new_state, updated_by="manual_override", reason="User manual toggle"
-    )
+    await redis.set_switch(name, new_state, updated_by="manual_override", reason="User manual toggle")
 
     # ZEN70 1.1: Web网关通过 Redis pub/sub 与拥有 docker.sock 权限的底层探针通信
     # 我们不在网关层直接执行 subprocess (受制于 read_only 和 cap_drop)，而是发布变更事件
@@ -210,15 +208,11 @@ async def sse_events(
 
     async def event_generator():
         try:
-            await pubsub.subscribe(
-                CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS
-            )
+            await pubsub.subscribe(CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS)
             yield "event: connected\ndata: {}\n\n"
             while True:
                 try:
-                    if getattr(request, "is_disconnected", None) and callable(
-                        request.is_disconnected
-                    ):
+                    if getattr(request, "is_disconnected", None) and callable(request.is_disconnected):
                         if request.is_disconnected():
                             break
                     message = await asyncio.wait_for(
@@ -240,9 +234,7 @@ async def sse_events(
                     yield ": heartbeat\n\n"
         finally:
             try:
-                await pubsub.unsubscribe(
-                    CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS
-                )
+                await pubsub.unsubscribe(CHANNEL_HARDWARE_EVENTS, CHANNEL_SWITCH_EVENTS, CHANNEL_BOARD_EVENTS)
             except Exception:
                 pass
             try:

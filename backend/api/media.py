@@ -137,9 +137,7 @@ async def transcode_hint(
     当 GPU 离线时，网关根据 CPU 负载决定是否允许软转码或直接拒绝。
     """
     # 读取探针上报的能力标签
-    gpu_available = Path("/dev/dri/renderD128").exists() or "gpu_nvenc_v1" in os.getenv(
-        "CAPABILITY_TAGS", ""
-    )
+    gpu_available = Path("/dev/dri/renderD128").exists() or "gpu_nvenc_v1" in os.getenv("CAPABILITY_TAGS", "")
 
     if gpu_available:
         return {

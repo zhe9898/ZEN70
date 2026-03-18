@@ -36,9 +36,7 @@ ACTIVE_CONNECTIONS = Gauge(
 )
 
 
-async def metrics_middleware(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
+async def metrics_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """
     轻量级 FastAPI Prometheus 中间件。
     记录耗时、状态码及并发活跃连接，免疫超时脑裂。

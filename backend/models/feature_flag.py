@@ -107,9 +107,7 @@ DEFAULT_CONFIGS = [
         value="openai/clip-vit-base-patch32",
         description="当前使用的 AI 视觉模型（可在设置页切换）",
     ),
-    SystemConfig(
-        key="ai_inference_timeout", value="5", description="单次 AI 推理超时秒数（极刑熔断）"
-    ),
+    SystemConfig(key="ai_inference_timeout", value="5", description="单次 AI 推理超时秒数（极刑熔断）"),
     SystemConfig(key="ai_worker_interval", value="10", description="AI Worker 扫描间隔（秒）"),
     SystemConfig(key="ai_max_batch_size", value="10", description="AI Worker 每轮最大处理资产数"),
     # 网络与端口
@@ -118,9 +116,7 @@ DEFAULT_CONFIGS = [
     SystemConfig(key="caddy_http_port", value="80", description="Caddy 反向代理 HTTP 端口"),
     SystemConfig(key="caddy_https_port", value="443", description="Caddy 反向代理 HTTPS 端口"),
     # 域名配置
-    SystemConfig(
-        key="caddy_domain", value="", description="Caddy 反代挂载域名（如 home.example.com）"
-    ),
+    SystemConfig(key="caddy_domain", value="", description="Caddy 反代挂载域名（如 home.example.com）"),
     SystemConfig(
         key="cf_tunnel_domain",
         value="",
@@ -139,11 +135,7 @@ DEFAULT_CONFIGS = [
     ),
     SystemConfig(
         key="jellyfin_data_path",
-        value=(
-            f"{os.getenv('MEDIA_PATH', '').strip()}/jellyfin".strip("/")
-            if os.getenv("MEDIA_PATH", "").strip()
-            else ""
-        ),
+        value=(f"{os.getenv('MEDIA_PATH', '').strip()}/jellyfin".strip("/") if os.getenv("MEDIA_PATH", "").strip() else ""),
         description="Jellyfin 媒体库路径",
     ),
 ]

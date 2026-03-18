@@ -88,9 +88,7 @@ def scan_and_verify_directory(target_dir: str):
             except OSError:
                 continue
 
-            cursor.execute(
-                "SELECT sha256, size FROM file_hashes WHERE filepath = ?", (str(filepath),)
-            )
+            cursor.execute("SELECT sha256, size FROM file_hashes WHERE filepath = ?", (str(filepath),))
             row = cursor.fetchone()
 
             if not row:
@@ -124,9 +122,7 @@ def scan_and_verify_directory(target_dir: str):
     conn.close()
 
     if corrupted_files:
-        logger.critical(
-            f"本次巡检发现 {len(corrupted_files)} 个静默腐败文件！需要立即从高可用端或 S3 降级恢复。"
-        )
+        logger.critical(f"本次巡检发现 {len(corrupted_files)} 个静默腐败文件！需要立即从高可用端或 S3 降级恢复。")
         # TODO: Trigger AlertManager API via httpx or internal call
 
 

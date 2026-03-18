@@ -191,9 +191,7 @@ async def health_check(request: Request):
         services["redis"] = "error"
     try:
         postgres_dsn = get_settings().get("postgres_dsn")
-        services["postgres"] = await asyncio.wait_for(
-            _check_postgres_async(postgres_dsn), timeout=2.0
-        )
+        services["postgres"] = await asyncio.wait_for(_check_postgres_async(postgres_dsn), timeout=2.0)
     except asyncio.TimeoutError:
         services["postgres"] = "timeout"
     status = "healthy" if services.get("redis") == "ok" else "unhealthy"

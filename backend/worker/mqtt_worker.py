@@ -72,9 +72,7 @@ async def process_event(event_data: dict) -> None:
     snapshot_b64 = after.get("snapshot")
 
     if not snapshot_b64:
-        logger.debug(
-            f"Event {event_id} has no embedded snapshot. Need API fetch (mocking for now)."
-        )
+        logger.debug(f"Event {event_id} has no embedded snapshot. Need API fetch (mocking for now).")
         return
 
     try:
@@ -89,9 +87,7 @@ async def process_event(event_data: dict) -> None:
 
     async with _async_session_factory() as session:
         # Avoid duplicate processing for the same event
-        existing = await session.execute(
-            select(Asset).where(Asset.media_metadata["frigate_event_id"].astext == event_id)
-        )
+        existing = await session.execute(select(Asset).where(Asset.media_metadata["frigate_event_id"].astext == event_id))
         if existing.scalar_one_or_none():
             logger.debug(f"Event {event_id} already processed.")
             return

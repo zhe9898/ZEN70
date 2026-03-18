@@ -13,9 +13,7 @@ from watchdog.observers import Observer
 from backend.db import _async_session_factory
 from backend.models.asset import Asset
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("media_watcher")
 
 # 初始化配置
@@ -107,9 +105,7 @@ def classify_tags(image_embedding):
 
     emb = np.array(image_embedding)
     # Cosine similarity
-    similarities = np.dot(tag_embeddings, emb) / (
-        np.linalg.norm(tag_embeddings, axis=1) * np.linalg.norm(emb)
-    )
+    similarities = np.dot(tag_embeddings, emb) / (np.linalg.norm(tag_embeddings, axis=1) * np.linalg.norm(emb))
 
     # 选出相似度大于阈值的标签
     THRESHOLD = 0.22
@@ -137,20 +133,13 @@ async def process_pending_assets():
                 if gpu_state and gpu_state.get("taint"):
                     taint = gpu_state["taint"]
                     if "NoSchedule" in taint:
-                        logger.warning(
-                            f"Taint Active ({taint}). Media watcher yielding execution (Toleration Rejection)."
-                        )
+                        logger.warning(f"Taint Active ({taint}). Media watcher yielding execution (Toleration Rejection).")
                         await asyncio.sleep(15)
                         continue
 
             async with _async_session_factory() as db:
                 # 查找未处理资产 (添加 FOR UPDATE SKIP LOCKED 防止多容器节点竞态拉取同一个资源)
-                result = await db.execute(
-                    select(Asset)
-                    .where(Asset.embedding_status == "pending")
-                    .limit(10)
-                    .with_for_update(skip_locked=True)
-                )
+                result = await db.execute(select(Asset).where(Asset.embedding_status == "pending").limit(10).with_for_update(skip_locked=True))
                 assets = result.scalars().all()
 
                 for asset in assets:
@@ -167,9 +156,7 @@ async def process_pending_assets():
                         continue
 
                     # 执行模型推断 (放于线程池)
-                    img_pil, emb = await asyncio.to_thread(
-                        process_image_or_video, physical_path, asset.asset_type
-                    )
+                    img_pil, emb = await asyncio.to_thread(process_image_or_video, physical_path, asset.asset_type)
 
                     if emb:
                         tags, is_emotion = classify_tags(emb)
@@ -177,9 +164,7 @@ async def process_pending_assets():
                         asset.ai_tags = tags
                         asset.is_emotion_highlight = is_emotion
                         asset.embedding_status = "done"
-                        logger.info(
-                            f"Asset {asset.id} processed successfully. Tags: {tags}, Emotion: {is_emotion}"
-                        )
+                        logger.info(f"Asset {asset.id} processed successfully. Tags: {tags}, Emotion: {is_emotion}")
                     else:
                         asset.embedding_status = "failed"
 

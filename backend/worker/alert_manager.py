@@ -42,9 +42,7 @@ async def push_to_bark(bark_url: str, title: str, body: str, level: str):
     if level == "critical":
         params["sound"] = "alarm"  # 刺耳报警音
         params["level"] = "timeSensitive"  # 穿透专注模式
-        params["icon"] = (
-            "https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/zen.png"  # 假定的本地图标
-        )
+        params["icon"] = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/zen.png"  # 假定的本地图标
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:

@@ -76,12 +76,8 @@ def check_ups_status() -> Tuple[bool, Optional[str]]:
 
         # 简单解析 ups.status 和 battery.charge
         out = r.stdout
-        status_line = next(
-            (line for line in out.splitlines() if line.startswith("ups.status:")), ""
-        )
-        charge_line = next(
-            (line for line in out.splitlines() if line.startswith("battery.charge:")), ""
-        )
+        status_line = next((line for line in out.splitlines() if line.startswith("ups.status:")), "")
+        charge_line = next((line for line in out.splitlines() if line.startswith("battery.charge:")), "")
 
         # 解析电量，若低于 20% 返回 LOW_BATTERY 触发熔断
         charge = 100
@@ -193,10 +189,7 @@ def check_hardware_status(
             logger.debug(f"[{capability}] ONLINE path={path}")
         elif all_fail:
             r.set(state_key, "PENDING_MAINTENANCE", ex=LOCK_TTL)
-            logger.warning(
-                f"熔断 [{capability}] 路径丢失 连续{WINDOW_SIZE}次确认 "
-                f"path={path} reason={reason}"
-            )
+            logger.warning(f"熔断 [{capability}] 路径丢失 连续{WINDOW_SIZE}次确认 " f"path={path} reason={reason}")
 
     # UPS 动态感知 (Plug & Play)
     ups_capability = "ups"
@@ -233,9 +226,7 @@ def check_hardware_status(
 
 def main() -> None:
     logger.info("ZEN70 拓扑探针启动 (滑动窗口防抖+三重核验)")
-    logger.info(
-        "Redis %s:%s 轮询周期 %ss 锁TTL %ss", REDIS_HOST, REDIS_PORT, POLL_INTERVAL, LOCK_TTL
-    )
+    logger.info("Redis %s:%s 轮询周期 %ss 锁TTL %ss", REDIS_HOST, REDIS_PORT, POLL_INTERVAL, LOCK_TTL)
 
     r = get_redis_client()
     window_cache: Dict[str, Deque[bool]] = {}

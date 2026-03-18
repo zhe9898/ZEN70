@@ -129,9 +129,7 @@ async def universal_ai_proxy(
             # 如果偏好是 cloud，将 target_url 悄悄变轨到公有云
             route_pref = user_data.get("ai_route_preference", "auto")
             if route_pref == "cloud":
-                public_cloud_url = os.getenv(
-                    "EXTERNAL_OPENAI_URL", "https://api.openai.com/v1"
-                ).rstrip("/")
+                public_cloud_url = os.getenv("EXTERNAL_OPENAI_URL", "https://api.openai.com/v1").rstrip("/")
                 public_cloud_key = os.getenv("EXTERNAL_OPENAI_KEY", "")
                 if public_cloud_key:
                     target_url = f"{public_cloud_url}/{path}"
@@ -179,9 +177,7 @@ async def universal_ai_proxy(
     except Exception as e:
         import logging
 
-        logging.getLogger("zen70.ai_router").warning(
-            f"AI 拦截器运行失败 (Prompt Override Error): {e}"
-        )
+        logging.getLogger("zen70.ai_router").warning(f"AI 拦截器运行失败 (Prompt Override Error): {e}")
     # ---------------------------------------------------------
 
     # 构建转发闭包，以便用于 asyncio.wait_for 包装
@@ -205,19 +201,13 @@ async def universal_ai_proxy(
         return StreamingResponse(
             stream_generator(),
             status_code=resp.status_code,
-            headers={
-                k: v
-                for k, v in resp.headers.items()
-                if k.lower() not in ("content-length", "content-encoding")
-            },
+            headers={k: v for k, v in resp.headers.items() if k.lower() not in ("content-length", "content-encoding")},
         )
 
     # 3. 法典 4.0 显存防刷极刑 (8s Guillotine 大闸)
     # 无论后端计算多沉重，只要超过 8s 直接斩断，并从网关抛出优雅降级。
     try:
-        result_response = await asyncio.wait_for(
-            _forward_request(), timeout=MULTIMODAL_TIMEOUT_SECONDS
-        )
+        result_response = await asyncio.wait_for(_forward_request(), timeout=MULTIMODAL_TIMEOUT_SECONDS)
         return result_response
     except asyncio.TimeoutError:
         # 法典 1.56: 优雅返回 HTTP 206 Partial Content (纯文本强制截断)，防止前端流式聊天组件抛红
