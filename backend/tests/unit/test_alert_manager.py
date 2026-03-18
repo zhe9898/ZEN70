@@ -10,7 +10,7 @@ from backend.worker.alert_manager import (
     push_to_serverchan,
     trigger_alert_endpoint,
 )
-from tests.factories import AlertPayloadFactory, MockUserFactory
+from backend.tests.factories import AlertPayloadFactory, MockUserFactory
 
 
 @pytest.fixture
