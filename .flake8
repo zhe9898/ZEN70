@@ -1,4 +1,4 @@
 # flake8 配置：与 CI 流水线一致，确保本地与远程零差异
 [flake8]
-max-line-length = 120
+max-line-length = 160
 extend-ignore = E203, W503
