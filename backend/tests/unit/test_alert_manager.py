@@ -4,13 +4,13 @@ import respx
 from httpx import Response
 
 from backend.models.system import SystemLog
+from backend.tests.factories import AlertPayloadFactory, MockUserFactory
 from backend.worker.alert_manager import (
     AlertPayload,
     push_to_bark,
     push_to_serverchan,
     trigger_alert_endpoint,
 )
-from backend.tests.factories import AlertPayloadFactory, MockUserFactory
 
 
 @pytest.fixture
