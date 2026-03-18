@@ -64,7 +64,7 @@ python start_installer.py
 | `frontend/` | Vue 3 + Vite 协议驱动渲染 |
 | `scripts/` | 点火脚本、配置编译器、验真探针 |
 | `config/` | IaC 配置 `system.yaml` |
-| `docs/` | **[架构设计书 (ZEN70_Architecture_Design_V3.0.md)](docs/ZEN70_Architecture_Design_V3.0.md)** <br> **[核心业务原素 (ZEN70_Business_Features_V3.0.md)](docs/ZEN70_Business_Features_V3.0.md)** |
+| `docs/` | **[极客私有边缘云架构与业务全景白皮书 (ZEN70_Architecture_and_Features_V2.9.1.md)](docs/ZEN70_Architecture_and_Features_V2.9.1.md)** <br> **[真实 20 倍压力测试报告 (SRE_TRUE_20X_REPORT.md)](docs/reports/SRE_TRUE_20X_REPORT.md)** |
 | `tests/` | 单元/集成/E2E 测试 |
 
 ---
