@@ -82,13 +82,13 @@ jobs:
           zip -r zen70_v2.9_offline_bundle.zip ZEN70_V2.9/
           
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v2.9"
-          name: "ZEN70 V2.9 (Offline Docker Bundle)"
-          files: offline_bundle/zen70_v2.9_offline_bundle.zip
-          draft: false
-          prerelease: false
-          make_latest: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view v2.9 >/dev/null 2>&1; then
+            echo "Release v2.9 exists, uploading asset and overwriting..."
+            gh release upload v2.9 offline_bundle/zen70_v2.9_offline_bundle.zip --clobber
+          else
+            echo "Creating new release v2.9..."
+            gh release create v2.9 offline_bundle/zen70_v2.9_offline_bundle.zip --title "ZEN70 V2.9 (Offline Docker Bundle)" --notes "Automated True-Offline Container Release"
+          fi
